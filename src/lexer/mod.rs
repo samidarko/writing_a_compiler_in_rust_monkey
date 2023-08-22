@@ -238,7 +238,7 @@ if (5 < 10) {
         let mut tok;
 
         for expectation in expectations {
-            tok = lexer.next_token().expect("test");    // TODO test to return Result?
+            tok = lexer.next_token().expect("test"); // TODO test to return Result?
             assert_eq!(tok, expectation);
         }
     }
