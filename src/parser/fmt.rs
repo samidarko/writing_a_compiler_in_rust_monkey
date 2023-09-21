@@ -1,14 +1,29 @@
-use crate::parser::Error;
+use crate::parser::{ParserError, UnexpectedToken};
 use std::fmt;
-use std::fmt::Debug;
 
-impl fmt::Display for Error {
+impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::LexerError(value) => write!(f, "LexerError({})", value),
-            Error::UnexpectedToken(value) => write!(f, "LexerError({:?})", value),
-            Error::UnexpectedInfix(value) => write!(f, "LexerError({})", value),
-            Error::UnexpectedPrefix(value) => write!(f, "LexerError({})", value),
+            ParserError::LexerError(value) => write!(f, "ParserError::LexerError({})", value),
+            ParserError::UnexpectedToken(value) => {
+                write!(f, "ParserError::UnexpectedToken({:?})", value)
+            }
+            ParserError::UnexpectedInfix(value) => {
+                write!(f, "ParserError::UnexpectedInfix({})", value)
+            }
+            ParserError::UnexpectedPrefix(value) => {
+                write!(f, "ParserError::UnexpectedPrefix({})", value)
+            }
         }
+    }
+}
+
+impl fmt::Display for UnexpectedToken {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "UnexpectedToken {{ want: {}, got: {} }}",
+            self.want, self.got
+        )
     }
 }

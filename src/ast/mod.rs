@@ -6,8 +6,10 @@ mod fmt;
 pub enum Node {
     Statement(Statement),
     Expression(Expression),
+    Program(Program),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -78,8 +80,8 @@ pub struct IfExpression {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionLiteral {
-    parameters: Vec<String>,
-    body: BlockStatement,
+    pub(crate) parameters: Vec<String>, // Vec<Identifier> ?
+    pub(crate) body: BlockStatement,
 }
 
 #[derive(Clone, Debug, PartialEq)]

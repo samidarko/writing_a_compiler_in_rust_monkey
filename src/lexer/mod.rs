@@ -4,11 +4,11 @@ use crate::token::Token;
 use crate::token::Token::*;
 use std::{num, result};
 
-#[derive(Debug, PartialEq)]
-pub enum Error {
+#[derive(Debug, PartialEq, Eq)]
+pub enum LexerError {
     IllegalInteger(num::ParseIntError),
 }
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, LexerError>;
 
 pub struct Lexer {
     input: Vec<char>,
@@ -121,7 +121,7 @@ impl Lexer {
         }
         match String::from_iter(&self.input[position..self.position]).parse::<isize>() {
             Ok(value) => Ok(Int(value)),
-            Err(error) => Err(Error::IllegalInteger(error)),
+            Err(error) => Err(LexerError::IllegalInteger(error)),
         }
     }
 }
@@ -132,12 +132,12 @@ pub fn is_letter(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::Lexer;
+    use crate::lexer::{Lexer, Result};
     use crate::token::Token;
     use crate::token::Token::*;
 
     #[test]
-    fn next_token() {
+    fn next_token() -> Result<()> {
         let input = "let five = 5;
 let ten = 10;
 
@@ -238,8 +238,59 @@ if (5 < 10) {
         let mut tok;
 
         for expectation in expectations {
-            tok = lexer.next_token().expect("test"); // TODO test to return Result?
+            tok = lexer.next_token()?;
             assert_eq!(tok, expectation);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn counter() -> Result<()> {
+        let input =
+            "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } };";
+        let expectations: Vec<Token> = Vec::from([
+            Let,
+            Ident("counter".to_string()),
+            Assign,
+            Fn,
+            LParen,
+            Ident("x".to_string()),
+            RParen,
+            LBrace,
+            If,
+            LParen,
+            Ident("x".to_string()),
+            GT,
+            Int(100),
+            RParen,
+            LBrace,
+            Return,
+            True,
+            Semicolon,
+            RBrace,
+            Else,
+            LBrace,
+            Ident("counter".to_string()),
+            LParen,
+            Ident("x".to_string()),
+            Plus,
+            Int(1),
+            RParen,
+            Semicolon,
+            RBrace,
+            RBrace,
+            Semicolon,
+            EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
     }
 }

@@ -7,6 +7,7 @@ impl Display for Node {
         match self {
             Node::Statement(statement) => statement.fmt(f),
             Node::Expression(expression) => expression.fmt(f),
+            Node::Program(program) => program.fmt(f),
         }
     }
 }

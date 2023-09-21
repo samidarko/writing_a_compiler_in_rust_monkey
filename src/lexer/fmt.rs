@@ -1,11 +1,11 @@
 use std::fmt::{Display, Formatter, Result};
 
-use super::Error;
+use super::LexerError;
 
-impl Display for Error {
+impl Display for LexerError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            Error::IllegalInteger(err) => write!(f, "illegal integer number: {}", err),
+            LexerError::IllegalInteger(err) => write!(f, "illegal integer number: {}", err),
         }
     }
 }
