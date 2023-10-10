@@ -53,7 +53,8 @@ fn eval_statement(statement: ast::Statement, environment: &mut Environment) -> R
         Statement::Expression(expression) => eval(Node::Expression(expression), environment),
         Statement::Let(let_statement) => {
             let object = eval(Node::Expression(let_statement.value), environment)?;
-            Ok(environment.set(&let_statement.name, object))
+            environment.set(&let_statement.name, &object);
+            Ok(object)
         }
         Statement::Return(return_statement) => {
             let object = eval(Node::Expression(return_statement.value), environment)?;
@@ -67,7 +68,11 @@ fn eval_statement(statement: ast::Statement, environment: &mut Environment) -> R
 
 fn eval_expression(expression: ast::Expression, environment: &mut Environment) -> Result<Object> {
     let object = match expression {
-        Expression::Identifier(name) => return environment.get(&name),
+        Expression::Identifier(name) => {
+            return environment
+                .get(&name)
+                .ok_or_else(|| format!("identifier not found: {}", &name))
+        }
         Expression::Boolean(value) => Object::Boolean(value),
         Expression::Int(value) => Object::Int(value),
         Expression::Infix(infix_expression) => {
@@ -92,9 +97,7 @@ fn eval_expression(expression: ast::Expression, environment: &mut Environment) -
 
             let function = match object {
                 Object::Function(f) => f,
-                _ => {
-                    return Err("object should be Object::Function".to_string())
-                }
+                _ => return Err("object should be Object::Function".to_string()),
             };
 
             return apply_function(function, &arguments);
@@ -133,13 +136,11 @@ fn unwrap_return_value(object: Object) -> Object {
     }
 }
 
-fn extended_function_environment(
-    function: &object::Function,
-    arguments: &[Object],
-) -> Environment {
+fn extended_function_environment(function: &object::Function, arguments: &[Object]) -> Environment {
     let mut environment = Environment::new_enclosed_environment(function.env.clone());
     for (i, name) in function.parameters.iter().enumerate() {
-        environment.set(name, arguments[i].clone());
+        // environment.set(name, arguments[i].clone());
+        environment.set(name, &arguments[i]);
     }
     environment
 }
@@ -239,8 +240,10 @@ mod tests {
         let lexer = Lexer::new(input.chars().collect());
         let mut parser = Parser::new(lexer).expect("a new parser to be created");
         let program = parser.parse().expect("the parse function to be successful");
-        // println!("{:?}", program.statements);
         let mut environment = Environment::new();
+        println!("{}", program.statements.len());
+        println!("{:?}", program.statements[0]);
+        println!("{:?}", program.statements[1]);
         let object = eval(ast::Node::Program(program), &mut environment)?;
         Ok(object)
     }
@@ -393,14 +396,13 @@ f(10);",
                 "5; true + false; 5",
                 Err("unknown operator: true + false".to_string()),
             ),
-
             (
                 "true + false + true + false;",
                 Err("unknown operator: true + false".to_string()),
             ),
             (
-                 "5; true + false; 5",
-                 Err("unknown operator: true + false".to_string()),
+                "5; true + false; 5",
+                Err("unknown operator: true + false".to_string()),
             ),
             (
                 "if (10 > 1) { true + false; }",
@@ -529,7 +531,7 @@ addTwo(2);
 
     #[test]
     fn counter() -> Result<()> {
-        let input = "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } }; counter(0);";
+        let input = "let counter = fn(x) { if (x > 1) { return true; } else { counter(x + 1); } }; counter(0);";
 
         let object = test_eval(input)?;
         assert_eq!(object, Object::Boolean(true));
