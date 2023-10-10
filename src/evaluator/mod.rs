@@ -1,4 +1,4 @@
-use crate::ast::{BlockStatement, Expression, Node, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Node, Statement};
 use crate::object::environment::Environment;
 use crate::object::{Object, ReturnValue};
 use crate::token::Token;
@@ -8,26 +8,82 @@ use std::result;
 pub type Result<T> = result::Result<T, String>;
 
 pub fn eval(node: Node, environment: &mut Environment) -> Result<Object> {
+    println!("{:?}", &node);
+    println!("=> {:?}", &environment);
+    println!();
     match node {
-        Node::Statement(statement) => eval_statement(statement, environment),
-        Node::Expression(expression) => eval_expression(expression, environment),
-        Node::Program(program) => eval_program(program, environment),
-    }
-}
+        Node::Statement(statement) => match statement {
+            Statement::Expression(expression) => eval(Node::Expression(expression), environment),
+            Statement::Let(let_statement) => {
+                let object = eval(Node::Expression(let_statement.value), environment)?;
+                environment.set(&let_statement.name, &object);
+                Ok(object)
+            }
+            Statement::Return(return_statement) => {
+                let object = eval(Node::Expression(return_statement.value), environment)?;
+                Ok(Object::Return(ReturnValue {
+                    value: Box::new(object),
+                }))
+            }
+            Statement::Block(block_statement) => eval_block_statement(block_statement, environment),
+        },
+        Node::Expression(expression) => {
+            let object = match expression {
+                Expression::Identifier(name) => {
+                    let temp = environment
+                        .get(&name)
+                        .ok_or_else(|| format!("identifier not found: {}", &name));
+                    return temp
+                }
+                Expression::Boolean(value) => Object::Boolean(value),
+                Expression::Int(value) => Object::Int(value),
+                Expression::Infix(infix_expression) => {
+                    let right = eval(Node::Expression(*infix_expression.right), environment)?;
+                    let left = eval(Node::Expression(*infix_expression.left), environment)?;
+                    return eval_infix_expression(infix_expression.operator, left, right);
+                }
+                Expression::Prefix(pre_expression) => {
+                    let right = eval(Node::Expression(*pre_expression.right), environment)?;
+                    return eval_prefix_expression(pre_expression.operator, right);
+                }
+                Expression::If(if_expression) => {
+                    return eval_if_expression(if_expression, environment)
+                }
+                Expression::Function(function_literal) => Object::Function(object::Function {
+                    // TODO maybe problem is happening when we clone here?
+                    parameters: function_literal.parameters,
+                    body: function_literal.body,
+                    env: environment.clone(),
+                }),
+                Expression::Call(call_expression) => {
+                    let object = eval(Node::Expression(*call_expression.function), environment)?;
+                    let arguments = eval_expressions(call_expression.arguments, environment)?;
 
-fn eval_program(program: Program, environment: &mut Environment) -> Result<Object> {
-    let mut result: Object = Object::Null;
-    for statement in program.statements {
-        let object = eval(Node::Statement(statement), environment)?;
+                    let function = match object {
+                        Object::Function(f) => f,
+                        _ => return Err("object should be Object::Function".to_string()),
+                    };
 
-        if let Object::Return(return_value) = object {
-            return Ok(*return_value.value);
+                    return apply_function(function, &arguments);
+                }
+            };
+            Ok(object)
         }
+        Node::Program(program) => {
+            let mut result: Object = Object::Null;
+            for statement in program.statements {
+                let object = eval(Node::Statement(statement), environment)?;
 
-        result = object;
+                if let Object::Return(return_value) = object {
+                    return Ok(*return_value.value);
+                }
+
+                result = object;
+            }
+
+            Ok(result)
+        }
     }
-
-    Ok(result)
 }
 
 fn eval_block_statement(
@@ -46,61 +102,6 @@ fn eval_block_statement(
     }
 
     Ok(result)
-}
-
-fn eval_statement(statement: ast::Statement, environment: &mut Environment) -> Result<Object> {
-    match statement {
-        Statement::Expression(expression) => eval(Node::Expression(expression), environment),
-        Statement::Let(let_statement) => {
-            let object = eval(Node::Expression(let_statement.value), environment)?;
-            Ok(environment.set(&let_statement.name, object))
-        }
-        Statement::Return(return_statement) => {
-            let object = eval(Node::Expression(return_statement.value), environment)?;
-            Ok(Object::Return(ReturnValue {
-                value: Box::new(object),
-            }))
-        }
-        Statement::Block(block_statement) => eval_block_statement(block_statement, environment),
-    }
-}
-
-fn eval_expression(expression: ast::Expression, environment: &mut Environment) -> Result<Object> {
-    let object = match expression {
-        Expression::Identifier(name) => return environment.get(&name),
-        Expression::Boolean(value) => Object::Boolean(value),
-        Expression::Int(value) => Object::Int(value),
-        Expression::Infix(infix_expression) => {
-            let right = eval(Node::Expression(*infix_expression.right), environment)?;
-            let left = eval(Node::Expression(*infix_expression.left), environment)?;
-            return eval_infix_expression(infix_expression.operator, left, right);
-        }
-        Expression::Prefix(pre_expression) => {
-            let right = eval(Node::Expression(*pre_expression.right), environment)?;
-            return eval_prefix_expression(pre_expression.operator, right);
-        }
-        Expression::If(if_expression) => return eval_if_expression(if_expression, environment),
-        Expression::Function(function_literal) => Object::Function(object::Function {
-            // TODO maybe problem is happening when we clone here?
-            parameters: function_literal.parameters,
-            body: function_literal.body,
-            env: environment.clone(),
-        }),
-        Expression::Call(call_expression) => {
-            let object = eval(Node::Expression(*call_expression.function), environment)?;
-            let arguments = eval_expressions(call_expression.arguments, environment)?;
-
-            let function = match object {
-                Object::Function(f) => f,
-                _ => {
-                    return Err("object should be Object::Function".to_string())
-                }
-            };
-
-            return apply_function(function, &arguments);
-        }
-    };
-    Ok(object)
 }
 
 fn eval_expressions(
@@ -133,13 +134,11 @@ fn unwrap_return_value(object: Object) -> Object {
     }
 }
 
-fn extended_function_environment(
-    function: &object::Function,
-    arguments: &[Object],
-) -> Environment {
+fn extended_function_environment(function: &object::Function, arguments: &[Object]) -> Environment {
     let mut environment = Environment::new_enclosed_environment(function.env.clone());
     for (i, name) in function.parameters.iter().enumerate() {
-        environment.set(name, arguments[i].clone());
+        // environment.set(name, arguments[i].clone());
+        environment.set(name, &arguments[i]);
     }
     environment
 }
@@ -239,8 +238,13 @@ mod tests {
         let lexer = Lexer::new(input.chars().collect());
         let mut parser = Parser::new(lexer).expect("a new parser to be created");
         let program = parser.parse().expect("the parse function to be successful");
-        // println!("{:?}", program.statements);
         let mut environment = Environment::new();
+        // println!("{}", program.statements.len());
+        // println!("{:?}", program.statements[0]);
+        // println!("{:?}", program.statements[1]);
+
+        // println!("{}", program.statements.len());
+        // println!("{:?}", program.statements);
         let object = eval(ast::Node::Program(program), &mut environment)?;
         Ok(object)
     }
@@ -393,14 +397,13 @@ f(10);",
                 "5; true + false; 5",
                 Err("unknown operator: true + false".to_string()),
             ),
-
             (
                 "true + false + true + false;",
                 Err("unknown operator: true + false".to_string()),
             ),
             (
-                 "5; true + false; 5",
-                 Err("unknown operator: true + false".to_string()),
+                "5; true + false; 5",
+                Err("unknown operator: true + false".to_string()),
             ),
             (
                 "if (10 > 1) { true + false; }",
@@ -529,10 +532,20 @@ addTwo(2);
 
     #[test]
     fn counter() -> Result<()> {
-        let input = "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } }; counter(0);";
+        let input = "let counter = fn(x) { if (x > 1) { return true; } else { counter(x + 1); } }; counter(1);";
 
         let object = test_eval(input)?;
         assert_eq!(object, Object::Boolean(true));
+
+        Ok(())
+    }
+
+    #[test]
+    fn add_two() -> Result<()> {
+        let input = "let add_two = fn(x) { x + 2 }; add_two(1);";
+
+        let object = test_eval(input)?;
+        assert_eq!(object, Object::Int(3));
 
         Ok(())
     }

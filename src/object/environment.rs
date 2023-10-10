@@ -1,8 +1,5 @@
 use crate::object::Object;
 use std::collections::HashMap;
-use std::result;
-
-pub type Result<T> = result::Result<T, String>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Environment {
@@ -24,34 +21,35 @@ impl Environment {
         env
     }
 
-    pub fn get(&self, name: &str) -> Result<Object> {
+    pub fn get(&self, name: &str) -> Option<Object> {
         match (self.store.get(name), &self.outer) {
-            (Some(object), _) => Ok(object.clone()),
+            (Some(object), _) => Some(object.clone()),
             (None, Some(outer)) => outer.get(name),
-            (None, _) => Err(format!("identifier not found: {}", &name)),
+            (None, _) => None,
         }
     }
 
-    pub fn set(&mut self, name: &str, object: Object) -> Object {
-        self.store.insert(name.to_string(), object);
-        self.get(name).unwrap()
+    pub fn set(&mut self, name: &str, object: &Object) {
+        self.store.insert(name.to_string(), object.clone());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::object::environment::Environment;
-    use crate::object::environment::Result;
     use crate::object::Object;
+    use std::result;
+
+    pub type Result<T> = result::Result<T, String>;
 
     #[test]
     fn environment_found() -> Result<()> {
         let mut environment = Environment::new();
         let name = "name".to_string();
 
-        environment.set(&name, Object::Null);
+        environment.set(&name, &Object::Null);
 
-        let object = environment.get(&name)?;
+        let object = environment.get(&name).unwrap();
         assert_eq!(object, Object::Null);
 
         Ok(())
@@ -62,10 +60,7 @@ mod tests {
         let environment = Environment::new();
         let name = "name".to_string();
 
-        assert_eq!(
-            environment.get(&name),
-            Err("identifier not found: name".to_string())
-        );
+        assert_eq!(environment.get(&name), None);
 
         Ok(())
     }
@@ -74,21 +69,21 @@ mod tests {
     fn enclosed_environment_found() -> Result<()> {
         let mut outer = Environment::new();
         let name = "name".to_string();
-        outer.set(&name, Object::Null);
+        outer.set(&name, &Object::Null);
 
         let mut environment = Environment::new_enclosed_environment(outer);
 
         // test outer environment
-        let object = environment.get(&name)?;
+        let object = environment.get(&name).unwrap();
         assert_eq!(object, Object::Null);
 
         // test current environment
-        environment.set(&name, Object::Int(1));
-        let object = environment.get(&name)?;
+        environment.set(&name, &Object::Int(1));
+        let object = environment.get(&name).unwrap();
         assert_eq!(object, Object::Int(1));
 
         let result = environment.get("unknown");
-        assert!(result.is_err());
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -99,10 +94,25 @@ mod tests {
         let environment = Environment::new_enclosed_environment(outer);
         let name = "name".to_string();
 
-        assert_eq!(
-            environment.get(&name),
-            Err("identifier not found: name".to_string())
-        );
+        assert_eq!(environment.get(&name), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn enclosed_environment_not_found_other() -> Result<()> {
+        let mut environment = Environment::new();
+        environment.set("name", &Object::Int(3));
+        environment.set("test", &Object::Boolean(true));
+
+        environment = Environment::new_enclosed_environment(environment);
+        environment.set("name", &Object::Int(2));
+
+        environment = Environment::new_enclosed_environment(environment);
+        environment.set("name", &Object::Int(1));
+
+        assert_eq!(environment.get("name"), Some(Object::Int(1)));
+        assert_eq!(environment.get("test"), Some(Object::Boolean(true)));
 
         Ok(())
     }
