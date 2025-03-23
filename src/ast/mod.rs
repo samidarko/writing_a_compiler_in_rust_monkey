@@ -9,15 +9,9 @@ pub enum Node {
     Program(Program),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Program {
     pub statements: Vec<Statement>,
-}
-
-impl Program {
-    pub fn new() -> Self {
-        Program { statements: vec![] }
-    }
 }
 
 // Statements
@@ -88,6 +82,12 @@ pub struct FunctionLiteral {
 pub struct CallExpression {
     pub(crate) function: Box<Expression>, // Identifier or FunctionLiteral
     pub(crate) arguments: Vec<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Identifier {
+    pub name: String,
+    // Could include source location information
 }
 
 #[cfg(test)]

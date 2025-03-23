@@ -388,7 +388,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<ast::Program> {
-        let mut program = ast::Program::new();
+        let mut program = ast::Program::default();
 
         while self.current != Token::EoF {
             let statement = self.parse_statement()?;
