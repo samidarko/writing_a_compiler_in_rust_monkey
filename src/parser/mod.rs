@@ -22,13 +22,13 @@ pub struct UnexpectedToken {
 }
 
 #[derive(Debug)]
-pub enum Error {
-    LexerError(lexer::Error),
+pub enum ParserError {
+    LexerError(lexer::LexerError),
     UnexpectedToken(UnexpectedToken),
     UnexpectedInfix(Token),
     UnexpectedPrefix(Token),
 }
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, ParserError>;
 
 pub struct Parser {
     lexer: lexer::Lexer,
@@ -50,7 +50,7 @@ impl Parser {
 
     fn next_token(&mut self) -> Result<()> {
         mem::swap(&mut self.current, &mut self.peek);
-        self.peek = self.lexer.next_token().map_err(Error::LexerError)?;
+        self.peek = self.lexer.next_token().map_err(ParserError::LexerError)?;
         Ok(())
     }
 
@@ -79,7 +79,7 @@ impl Parser {
             self.next_token()?;
             return Ok(());
         }
-        Err(Error::UnexpectedToken(UnexpectedToken {
+        Err(ParserError::UnexpectedToken(UnexpectedToken {
             want: format!("{}", token),
             got: format!("{}", &self.peek),
         }))
@@ -90,7 +90,7 @@ impl Parser {
             self.next_token()?;
             return Ok(());
         }
-        Err(Error::UnexpectedToken(UnexpectedToken {
+        Err(ParserError::UnexpectedToken(UnexpectedToken {
             want: format!("{}", token),
             got: format!("{}", &self.current),
         }))
@@ -108,7 +108,7 @@ impl Parser {
         if let Token::Ident(name) = &self.current {
             return Ok(name.to_string());
         }
-        Err(Error::UnexpectedToken(UnexpectedToken {
+        Err(ParserError::UnexpectedToken(UnexpectedToken {
             want: "identifier".to_string(),
             got: format!("{}", &self.current),
         }))
@@ -180,7 +180,8 @@ impl Parser {
             Token::True | Token::False => return self.parse_boolean(),
             Token::LParen => return self.parse_grouped_expression(),
             Token::If => return self.parse_if_expression(),
-            _ => return Err(Error::UnexpectedPrefix(self.current.clone())),
+            Token::Fn => return self.parse_function_literal(),
+            _ => return Err(ParserError::UnexpectedPrefix(self.current.clone())),
         };
         Ok(expression)
     }
@@ -191,8 +192,8 @@ impl Parser {
             Plus | Minus | Slash | Asterisk | EQ | NotEq | LT | GT => {
                 self.parse_infix_expression(left)
             }
-            LParen => return self.parse_call_expression(left),
-            _ => return Err(Error::UnexpectedInfix(self.current.clone())),
+            LParen => self.parse_call_expression(left),
+            _ => Err(ParserError::UnexpectedInfix(self.current.clone())),
         }
     }
 
@@ -262,7 +263,7 @@ impl Parser {
         let consequence = if let ast::Statement::Block(block) = self.parse_block_statement()? {
             block
         } else {
-            return Err(Error::UnexpectedToken(UnexpectedToken {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
                 want: "if block statement".to_string(),
                 got: format!("{}", &self.current),
             }));
@@ -284,7 +285,7 @@ impl Parser {
         let alternative = if let ast::Statement::Block(block) = self.parse_block_statement()? {
             Some(block)
         } else {
-            return Err(Error::UnexpectedToken(UnexpectedToken {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
                 want: "else block statement".to_string(),
                 got: format!("{}", &self.current),
             }));
@@ -330,6 +331,54 @@ impl Parser {
         Ok(arguments)
     }
 
+    fn parse_function_literal(&mut self) -> Result<ast::Expression> {
+        self.expect_peek(Token::LParen)?;
+
+        let parameters = self.parse_function_parameters()?;
+
+        self.expect_current(Token::RParen)?;
+        self.expect_current(Token::LBrace)?;
+
+        let body = if let ast::Statement::Block(block) = self.parse_block_statement()? {
+            block
+        } else {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                want: "fn block statement".to_string(),
+                got: format!("{}", &self.current),
+            }));
+        };
+
+        Ok(ast::Expression::Function(ast::FunctionLiteral {
+            parameters,
+            body,
+        }))
+    }
+
+    fn parse_function_parameters(&mut self) -> Result<Vec<String>> {
+        // TODO should we return Vec<Identifier> ?
+        let mut parameters = vec![];
+
+        if self.peek == Token::RParen {
+            self.next_token()?;
+            return Ok(parameters);
+        }
+
+        self.next_token()?;
+        let expression = self.parse_expression(Precedence::Lowest)?;
+        parameters.push(format!("{}", expression));
+
+        while self.peek == Token::Comma {
+            self.next_token()?;
+            self.next_token()?;
+            let expression = self.parse_expression(Precedence::Lowest)?;
+            parameters.push(format!("{}", expression));
+        }
+
+        self.expect_peek(Token::RParen)?;
+
+        Ok(parameters)
+    }
+
     fn parse_statement(&mut self) -> Result<ast::Statement> {
         match &self.current {
             Token::Let => self.parse_let_statement(),
@@ -339,7 +388,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<ast::Program> {
-        let mut program = ast::Program::new();
+        let mut program = ast::Program::default();
 
         while self.current != Token::EoF {
             let statement = self.parse_statement()?;
@@ -355,7 +404,6 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::ast;
-    use crate::ast::{Expression, InfixExpression, Program, Statement};
     use crate::lexer::Lexer;
     use crate::parser::{Parser, Result};
     use crate::token::Token;
@@ -422,7 +470,8 @@ return 993322;
         );
 
         let statement = &program.statements[0];
-        let expected = Statement::Expression(ast::Expression::Identifier("foobar".to_string()));
+        let expected =
+            ast::Statement::Expression(ast::Expression::Identifier("foobar".to_string()));
         assert_eq!(statement, &expected);
         Ok(())
     }
@@ -441,7 +490,7 @@ return 993322;
         );
 
         let statement = &program.statements[0];
-        let expected = Statement::Expression(ast::Expression::Int(5));
+        let expected = ast::Statement::Expression(ast::Expression::Int(5));
         assert_eq!(statement, &expected);
         Ok(())
     }
@@ -450,7 +499,7 @@ return 993322;
     fn boolean_expression() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![
             ("true;", "true"),
@@ -473,7 +522,7 @@ return 993322;
     fn prefix_expression() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![
             (
@@ -519,7 +568,7 @@ return 993322;
             );
 
             let statement = &program.statements[0];
-            let expected = Statement::Expression(ast::Expression::Prefix(test.1));
+            let expected = ast::Statement::Expression(ast::Expression::Prefix(test.1));
             assert_eq!(statement, &expected);
         }
         Ok(())
@@ -529,7 +578,7 @@ return 993322;
     fn if_else_expression() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![
             (
@@ -537,7 +586,7 @@ return 993322;
                 ast::IfExpression {
                     condition: Box::new(ast::Expression::Boolean(true)),
                     consequence: ast::BlockStatement {
-                        statements: vec![Statement::Expression(ast::Expression::Int(1))],
+                        statements: vec![ast::Statement::Expression(ast::Expression::Int(1))],
                     },
                     alternative: None,
                 },
@@ -547,10 +596,10 @@ return 993322;
                 ast::IfExpression {
                     condition: Box::new(ast::Expression::Boolean(false)),
                     consequence: ast::BlockStatement {
-                        statements: vec![Statement::Expression(ast::Expression::Int(0))],
+                        statements: vec![ast::Statement::Expression(ast::Expression::Int(0))],
                     },
                     alternative: Some(ast::BlockStatement {
-                        statements: vec![Statement::Expression(ast::Expression::Int(1))],
+                        statements: vec![ast::Statement::Expression(ast::Expression::Int(1))],
                     }),
                 },
             ),
@@ -569,8 +618,43 @@ return 993322;
             );
 
             let statement = &program.statements[0];
-            let expected = Statement::Expression(ast::Expression::If(test.1));
+            let expected = ast::Statement::Expression(ast::Expression::If(test.1));
             assert_eq!(statement, &expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn parse_function_literal() -> Result<()> {
+        let mut lexer: Lexer;
+        let mut parser: Parser;
+        let mut program: ast::Program;
+
+        let tests = vec![(
+            "fn(x, y) { x + y; };",
+            "fn(x, y) { (x + y) }",
+            ast::Expression::Function(ast::FunctionLiteral {
+                parameters: vec!["x".to_string(), "y".to_string()],
+                body: ast::BlockStatement {
+                    statements: vec![ast::Statement::Expression(ast::Expression::Infix(
+                        ast::InfixExpression {
+                            left: Box::new(ast::Expression::Identifier("x".to_string())),
+                            operator: Token::Plus,
+                            right: Box::new(ast::Expression::Identifier("y".to_string())),
+                        },
+                    ))],
+                },
+            }),
+        )];
+
+        for test in tests {
+            lexer = Lexer::new(test.0.chars().collect());
+            parser = Parser::new(lexer)?;
+            program = parser.parse()?;
+
+            let expected: Vec<ast::Statement> = vec![ast::Statement::Expression(test.2)];
+            assert_eq!(&program.statements, &expected);
+            assert_eq!(format!("{}", program), test.1);
         }
         Ok(())
     }
@@ -579,24 +663,24 @@ return 993322;
     fn call_expression() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![(
             "add(1, 2 * 3, 4 + 5);",
             "add(1, (2 * 3), (4 + 5))",
-            Expression::Call(ast::CallExpression {
-                function: Box::new(Expression::Identifier("add".to_string())),
+            ast::Expression::Call(ast::CallExpression {
+                function: Box::new(ast::Expression::Identifier("add".to_string())),
                 arguments: vec![
-                    Expression::Int(1),
-                    Expression::Infix(InfixExpression {
-                        left: Box::new(Expression::Int(2)),
+                    ast::Expression::Int(1),
+                    ast::Expression::Infix(ast::InfixExpression {
+                        left: Box::new(ast::Expression::Int(2)),
                         operator: Token::Asterisk,
-                        right: Box::new(Expression::Int(3)),
+                        right: Box::new(ast::Expression::Int(3)),
                     }),
-                    Expression::Infix(InfixExpression {
-                        left: Box::new(Expression::Int(4)),
+                    ast::Expression::Infix(ast::InfixExpression {
+                        left: Box::new(ast::Expression::Int(4)),
                         operator: Token::Plus,
-                        right: Box::new(Expression::Int(5)),
+                        right: Box::new(ast::Expression::Int(5)),
                     }),
                 ],
             }),
@@ -607,7 +691,7 @@ return 993322;
             parser = Parser::new(lexer)?;
             program = parser.parse()?;
 
-            let expected: Vec<Statement> = vec![Statement::Expression(test.2)];
+            let expected: Vec<ast::Statement> = vec![ast::Statement::Expression(test.2)];
             assert_eq!(&program.statements, &expected);
             assert_eq!(format!("{}", program), test.1);
         }
@@ -618,7 +702,7 @@ return 993322;
     fn infix_expression() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![
             (
@@ -724,7 +808,7 @@ return 993322;
             );
 
             let statement = &program.statements[0];
-            let expected = Statement::Expression(ast::Expression::Infix(test.1));
+            let expected = ast::Statement::Expression(ast::Expression::Infix(test.1));
             assert_eq!(statement, &expected);
         }
         Ok(())
@@ -734,7 +818,7 @@ return 993322;
     fn operator_precedence_parsing() -> Result<()> {
         let mut lexer: Lexer;
         let mut parser: Parser;
-        let mut program: Program;
+        let mut program: ast::Program;
 
         let tests = vec![
             ("-a * b", "((-a) * b)"),
@@ -777,6 +861,72 @@ return 993322;
             parser = Parser::new(lexer)?;
             program = parser.parse()?;
 
+            assert_eq!(format!("{}", program), test.1);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn counter() -> Result<()> {
+        let mut lexer: Lexer;
+        let mut parser: Parser;
+        let mut program: ast::Program;
+
+        let tests = vec![(
+            "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } };",
+            "let counter = fn(x) { if (x > 100) { return true; } else { counter((x + 1)) } };",
+            ast::LetStatement {
+                name: "counter".to_string(),
+                value: ast::Expression::Function(ast::FunctionLiteral {
+                    parameters: vec!["x".to_string()],
+                    body: ast::BlockStatement {
+                        statements: vec![ast::Statement::Expression(ast::Expression::If(
+                            ast::IfExpression {
+                                condition: Box::new(ast::Expression::Infix(ast::InfixExpression {
+                                    left: Box::new(ast::Expression::Identifier("x".to_string())),
+                                    operator: Token::GT,
+                                    right: Box::new(ast::Expression::Int(100)),
+                                })),
+                                consequence: ast::BlockStatement {
+                                    statements: vec![ast::Statement::Return(
+                                        ast::ReturnStatement {
+                                            value: ast::Expression::Boolean(true),
+                                        },
+                                    )],
+                                },
+                                alternative: Some(ast::BlockStatement {
+                                    statements: vec![ast::Statement::Expression(
+                                        ast::Expression::Call(ast::CallExpression {
+                                            function: Box::new(ast::Expression::Identifier(
+                                                "counter".to_string(),
+                                            )),
+                                            arguments: vec![ast::Expression::Infix(
+                                                ast::InfixExpression {
+                                                    left: Box::new(ast::Expression::Identifier(
+                                                        "x".to_string(),
+                                                    )),
+                                                    operator: Token::Plus,
+                                                    right: Box::new(ast::Expression::Int(1)),
+                                                },
+                                            )],
+                                        }),
+                                    )],
+                                }),
+                            },
+                        ))],
+                    },
+                }),
+            },
+        )];
+
+        for test in tests {
+            lexer = Lexer::new(test.0.chars().collect());
+            parser = Parser::new(lexer)?;
+            program = parser.parse()?;
+
+            let expected: Vec<ast::Statement> = vec![ast::Statement::Let(test.2)];
+            assert_eq!(&program.statements, &expected);
+            // assert_eq!(program.statements.len(), 1);
             assert_eq!(format!("{}", program), test.1);
         }
         Ok(())

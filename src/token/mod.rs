@@ -1,7 +1,7 @@
 mod fmt;
 mod from;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Illegal(char),
     EoF,
