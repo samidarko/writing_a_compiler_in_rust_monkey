@@ -1,4 +1,5 @@
 use crate::token::Token;
+use std::collections::BTreeMap;
 
 mod fmt;
 
@@ -15,7 +16,7 @@ pub struct Program {
 }
 
 // Statements
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Statement {
     Expression(Expression),
     Let(LetStatement),
@@ -23,62 +24,83 @@ pub enum Statement {
     Block(BlockStatement),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LetStatement {
     pub name: String,
     pub value: Expression,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ReturnStatement {
     pub value: Expression,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
 
 // Expressions
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expression {
     Identifier(String),
+    String(String),
     Boolean(bool), // TODO create a BooleanExpression struct? Or maybe reuse Token::True & Token::False?
+    Null,
     Int(isize), // TODO create a IntExpression struct? should we change to usize because of Minus prefix?
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     If(IfExpression),
     Function(FunctionLiteral),
     Call(CallExpression),
+    Array(ArrayLiteral),
+    Index(IndexExpression),
+    Hash(HashLiteral),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PrefixExpression {
     pub(crate) operator: Token,
     pub(crate) right: Box<Expression>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct IndexExpression {
+    pub(crate) left: Box<Expression>,
+    pub(crate) index: Box<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct InfixExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) operator: Token,
     pub(crate) right: Box<Expression>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct IfExpression {
     pub(crate) condition: Box<Expression>,
     pub(crate) consequence: BlockStatement,
     pub(crate) alternative: Option<BlockStatement>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FunctionLiteral {
     pub(crate) parameters: Vec<String>, // Vec<Identifier> ?
     pub(crate) body: BlockStatement,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArrayLiteral {
+    pub(crate) elements: Vec<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct HashLiteral {
+    pub(crate) pairs: BTreeMap<Expression, Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CallExpression {
     pub(crate) function: Box<Expression>, // Identifier or FunctionLiteral
     pub(crate) arguments: Vec<Expression>,

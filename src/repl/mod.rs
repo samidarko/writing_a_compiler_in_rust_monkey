@@ -19,10 +19,21 @@ pub fn repl() -> Result<(), String> {
 
         match io::stdin().read_line(&mut input) {
             Ok(_n) => {
-                let lexer = Lexer::new(input.chars().collect());
+                let trimmed = input.trim();
+
+                let lexer = Lexer::new(trimmed.chars().collect());
                 let mut parser = Parser::new(lexer).map_err(|e| e.to_string())?;
                 let program = parser.parse().map_err(|e| e.to_string())?;
                 let evaluated = eval(Node::Program(program), Rc::clone(&environment))?;
+
+                // Check if the evaluated result is an exit command
+                if let crate::object::Object::Exit(code) = &evaluated {
+                    writeln!(stdout, "Goodbye! (exit code: {})", code)
+                        .map_err(|e| e.to_string())?;
+                    // todo return the status code
+                    return Ok(());
+                }
+
                 writeln!(stdout, "{}", evaluated).map_err(|e| e.to_string())?;
                 input.clear();
             }

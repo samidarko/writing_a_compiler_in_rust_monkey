@@ -1,9 +1,12 @@
+mod builtins;
+
 use crate::ast::{BlockStatement, Expression, Node, Program, Statement};
 use crate::object::environment::Env;
 use crate::object::environment::Environment;
-use crate::object::{Object, ReturnValue};
+use crate::object::{ArrayLiteral, HashLiteral, Object, ReturnValue};
 use crate::token::Token;
 use crate::{ast, object};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::result;
 
@@ -47,7 +50,7 @@ fn eval_block_statement(block_statement: BlockStatement, environment: Env) -> Re
     Ok(result)
 }
 
-fn eval_statement(statement: ast::Statement, environment: Env) -> Result<Object> {
+fn eval_statement(statement: Statement, environment: Env) -> Result<Object> {
     match statement {
         Statement::Expression(expression) => eval(Node::Expression(expression), environment),
         Statement::Let(ast::LetStatement { name, value }) => {
@@ -68,12 +71,20 @@ fn eval_statement(statement: ast::Statement, environment: Env) -> Result<Object>
 fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Object> {
     let object = match expression {
         Expression::Identifier(name) => {
-            return environment
-                .borrow()
-                .get(&name)
-                .ok_or_else(|| format!("identifier not found: {}", name))
+            let identifier = environment.borrow().get(&name);
+            if let Some(value) = identifier {
+                return Ok(value);
+            }
+
+            if let Object::Builtin(builtin) = builtins::get_builtin(&name) {
+                return Ok(Object::Builtin(builtin));
+            }
+
+            return Err(format!("identifier not found: {}", name));
         }
         Expression::Boolean(value) => Object::Boolean(value),
+        Expression::Null => Object::Null,
+        Expression::String(value) => Object::String(value),
         Expression::Int(value) => Object::Int(value),
         Expression::Infix(infix_expression) => {
             let right = eval(
@@ -89,7 +100,6 @@ fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Obje
         }
         Expression::If(if_expression) => return eval_if_expression(if_expression, environment),
         Expression::Function(function_literal) => Object::Function(object::Function {
-            // TODO maybe problem is happening when we clone here?
             parameters: function_literal.parameters,
             body: function_literal.body,
             env: Rc::clone(&environment), // capture shared env
@@ -100,11 +110,30 @@ fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Obje
                 Rc::clone(&environment),
             )?;
             let args = eval_expressions(call_expression.arguments, Rc::clone(&environment))?;
-            let f = match func_obj {
-                Object::Function(f) => f,
-                _ => return Err("not a function".into()),
-            };
-            return apply_function(f, &args);
+            return apply_function(func_obj, &args);
+        }
+        Expression::Array(array_literal) => {
+            let elements = eval_expressions(array_literal.elements, Rc::clone(&environment))?;
+            if elements.len() == 1 {
+                if let Object::Error(_) = elements[0] {
+                    return Ok(elements[0].clone());
+                }
+            }
+            Object::Array(ArrayLiteral { elements })
+        }
+        Expression::Index(index_expression) => {
+            let left = eval_expression(*(index_expression.left), Rc::clone(&environment))?;
+            if let Object::Error(_) = left {
+                return Ok(left);
+            }
+            let index = eval_expression(*(index_expression.index), Rc::clone(&environment))?;
+            if let Object::Error(_) = index {
+                return Ok(index);
+            }
+            return Ok(eval_index_expression(left, index));
+        }
+        Expression::Hash(hash_literal) => {
+            return eval_hash_literal(Expression::Hash(hash_literal), environment)
         }
     };
     Ok(object)
@@ -121,10 +150,42 @@ fn eval_expressions(expressions: Vec<Expression>, environment: Env) -> Result<Ve
     Ok(objects)
 }
 
-fn apply_function(function: object::Function, arguments: &[Object]) -> Result<Object> {
-    let env = extended_function_environment(&function, arguments);
-    let evaluated = eval(Node::Statement(Statement::Block(function.body)), env)?;
-    Ok(unwrap_return_value(evaluated))
+#[allow(clippy::mutable_key_type)]
+fn eval_hash_literal(expression: Expression, environment: Env) -> Result<Object> {
+    let mut pairs = BTreeMap::new();
+
+    if let Expression::Hash(hash_literal) = expression {
+        for (key_expression, value_expression) in hash_literal.pairs {
+            let key = eval(Node::Expression(key_expression), Rc::clone(&environment))?;
+            if let Object::Error(error) = key {
+                return Ok(Object::Error(error));
+            }
+            let value = eval(Node::Expression(value_expression), Rc::clone(&environment))?;
+            if let Object::Error(error) = value {
+                return Ok(Object::Error(error));
+            }
+            pairs.insert(key, value);
+        }
+    } else {
+        return Ok(Object::Error(format!(
+            "invalid hash literal: {}",
+            expression
+        )));
+    }
+
+    Ok(Object::Hash(HashLiteral { pairs }))
+}
+
+fn apply_function(function: Object, arguments: &[Object]) -> Result<Object> {
+    match function {
+        Object::Function(f) => {
+            let env = extended_function_environment(&f, arguments);
+            let evaluated = eval(Node::Statement(Statement::Block(f.body)), env)?;
+            Ok(unwrap_return_value(evaluated))
+        }
+        Object::Builtin(f) => Ok((f.f)(arguments)),
+        _ => Err(format!("not a function: {}", function)),
+    }
 }
 
 fn unwrap_return_value(object: Object) -> Object {
@@ -196,6 +257,9 @@ fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Result
         }
         (Token::EQ, _, _) => Object::Boolean(left == right),
         (Token::NotEq, _, _) => Object::Boolean(left != right),
+        (_, Object::String(_), Object::String(_)) => {
+            eval_string_infix_expression(operator, left, right)?
+        }
         (_, left, right) if !left.is_same_variant(right) => {
             return Err(format!("type mismatch: {} {} {}", left, operator, right))
         }
@@ -224,6 +288,43 @@ fn eval_integer_infix_expression(operator: Token, left: Object, right: Object) -
     Ok(object)
 }
 
+fn eval_string_infix_expression(operator: Token, left: Object, right: Object) -> Result<Object> {
+    if operator != Token::Plus {
+        return Err(format!(
+            "unknown operator: {} {} {}",
+            &left, &operator, &right
+        ));
+    }
+
+    let left_value = left.to_string();
+    let right_value = right.to_string();
+    let object = Object::String(left_value + &right_value);
+    Ok(object)
+}
+
+fn eval_index_expression(left: Object, index: Object) -> Object {
+    match (left, index) {
+        (Object::Array(array_literal), Object::Int(index)) => {
+            let max = (array_literal.elements.len() - 1) as isize;
+
+            if index < 0 || index > max {
+                return Object::Error(format!("index out of range: {}", index));
+            }
+            array_literal.elements[index as usize].clone()
+        }
+        (Object::Hash(hash_literal), key) => match key {
+            Object::Int(_) | Object::Boolean(_) | Object::String(_) => {
+                if let Some(object) = hash_literal.pairs.get(&key) {
+                    return object.clone();
+                }
+                Object::Null
+            }
+            _ => Object::Error(format!("unusable as hash key: {}", key)),
+        },
+        (left, _) => Object::Error(format!("index operator isn't supported: {}", left)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast;
@@ -231,9 +332,10 @@ mod tests {
     use crate::lexer::Lexer;
     use crate::object;
     use crate::object::environment::Environment;
-    use crate::object::Object;
+    use crate::object::{ArrayLiteral, Object};
     use crate::parser::Parser;
     use crate::token::Token;
+    use std::collections::BTreeMap;
 
     fn test_eval(input: &str) -> Result<Object> {
         let lexer = Lexer::new(input.chars().collect());
@@ -409,6 +511,16 @@ f(10);",
                 Err("unknown operator: true + false".to_string()),
             ),
             ("foobar;", Err("identifier not found: foobar".to_string())),
+            (
+                r#""Hello" - "World""#,
+                Err("unknown operator: Hello - World".to_string()),
+            ),
+            (
+                r#"{"name": "Monkey"}[fn(x) { x }];"#,
+                Ok(Object::Error(
+                    "unusable as hash key: fn(x) {\nx\n}".to_string(),
+                )),
+            ),
         ];
 
         for test in tests {
@@ -527,10 +639,214 @@ addTwo(2);
 
     #[test]
     fn counter() -> Result<()> {
-        let input = "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } }; counter(0);";
+        let input = "let counter = fn(x) { if (x > 10) { return true; } else { counter(x + 1); } }; counter(0);";
 
         let object = test_eval(input)?;
         assert_eq!(object, Object::Boolean(true));
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_literal() -> Result<()> {
+        let input = r#""Hello" + " " + "World!""#;
+
+        let object = test_eval(input)?;
+        assert_eq!(object, Object::String("Hello World!".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn array_literals() -> Result<()> {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let object = test_eval(input)?;
+        assert_eq!(
+            object,
+            Object::Array(object::ArrayLiteral {
+                elements: vec![Object::Int(1), Object::Int(4), Object::Int(6)]
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_functions() -> Result<()> {
+        enum Expected {
+            Obj(Object),
+            Err(&'static str),
+        }
+        use Expected::*;
+
+        let tests: Vec<(&str, Expected)> = vec![
+            (r#"len("")"#, Obj(Object::Int(0))),
+            (r#"len("four")"#, Obj(Object::Int(4))),
+            (r#"len("hello world")"#, Obj(Object::Int(11))),
+            (r#"len(1)"#, Err("argument to `len` not supported, got 1")),
+            (
+                r#"len("one", "two")"#,
+                Err("wrong number of arguments. got=2, want=1"),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?; // same helper as in your other test
+
+            match expected {
+                Obj(obj) => {
+                    assert_eq!(evaluated, obj);
+                }
+                Err(msg) => match evaluated {
+                    Object::Error(ref e) => assert_eq!(e, msg, "wrong error message"),
+                    other => {
+                        panic!("object is not Error. got={:?}", other)
+                    }
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn array_index_expressions() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            ("[1, 2, 3][0]", Object::Int(1)),
+            ("[1, 2, 3][1]", Object::Int(2)),
+            ("[1, 2, 3][2]", Object::Int(3)),
+            ("let i = 0; [1][i];", Object::Int(1)),
+            ("[1, 2, 3][1 + 1];", Object::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Object::Int(3)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Object::Int(6),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Object::Int(2),
+            ),
+            (
+                "[1, 2, 3][3]",
+                Object::Error("index out of range: 3".to_string()),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?; // same helper as in your other test
+            assert_eq!(evaluated, expected);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn map_statement() -> Result<()> {
+        let input = "let map = fn(arr, f) {
+let iter = fn(arr, accumulated) {
+  if (len(arr) == 0) {
+    accumulated
+  } else {
+    iter(rest(arr), push(accumulated, f(first(arr))));
+  }
+};
+
+  iter(arr, []);
+};
+let a = [1, 2, 3, 4];
+let double = fn(x) { x * 2; };
+map(a, double);
+";
+
+        let object = test_eval(input)?;
+        assert_eq!(
+            object,
+            Object::Array(ArrayLiteral {
+                elements: vec![
+                    Object::Int(2),
+                    Object::Int(4),
+                    Object::Int(6),
+                    Object::Int(8)
+                ]
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn reduce_statement() -> Result<()> {
+        let input = "let reduce = fn(arr, initial, f) {
+  let iter = fn(arr, result) {
+    if (len(arr) == 0) {
+      result
+    } else {
+      iter(rest(arr), f(result, first(arr)));
+    }
+  };
+
+  iter(arr, initial);
+};
+let sum = fn(arr) {
+  reduce(arr, 0, fn(initial, el) { initial + el });
+};
+sum([1, 2, 3, 4, 5]);
+";
+
+        let object = test_eval(input)?;
+        assert_eq!(object, Object::Int(15));
+
+        Ok(())
+    }
+
+    #[test]
+    fn hash_literals() -> Result<()> {
+        let input = r#"let two = "two";
+{
+    "one": 10 - 9,
+    two: 1 + 1,
+    "thr" + "ee": 6 / 2,
+    4: 4,
+    true: 5,
+    false: 6
+}
+"#;
+
+        let object = test_eval(input)?;
+        let expected: BTreeMap<Object, Object> = BTreeMap::from([
+            (Object::String("one".to_string()), Object::Int(1)),
+            (Object::String("two".to_string()), Object::Int(2)),
+            (Object::String("three".to_string()), Object::Int(3)),
+            (Object::Int(4), Object::Int(4)),
+            (Object::Boolean(true), Object::Int(5)),
+            (Object::Boolean(false), Object::Int(6)),
+        ]);
+        if let Object::Hash(hash_literal) = object {
+            assert_eq!(hash_literal.pairs, expected);
+        } else {
+            panic!("not an Hash")
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn hash_index_expressions() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            (r#"{"foo": 5}["foo"]"#, Object::Int(5)),
+            (r#"{"foo": 5}["bar"]"#, Object::Null),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, Object::Int(5)),
+            (r#"{}["foo"]"#, Object::Null),
+            (r#"{5: 5}[5]"#, Object::Int(5)),
+            (r#"{true: 5}[true]"#, Object::Int(5)),
+            (r#"{false: 5}[false]"#, Object::Int(5)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?; // same helper as in your other test
+            assert_eq!(evaluated, expected);
+        }
 
         Ok(())
     }

@@ -12,6 +12,7 @@ impl fmt::Display for Token {
                 Token::EoF => "EoF",
                 Token::Ident(value) => value,
                 Token::Int(value) => return value.fmt(f),
+                Token::String(value) => value,
                 Token::Assign => "=",
                 Token::Plus => "+",
                 Token::Minus => "-",
@@ -23,6 +24,7 @@ impl fmt::Display for Token {
                 Token::EQ => "==",
                 Token::NotEq => "!=",
                 Token::Comma => ",",
+                Token::Colon => ":",
                 Token::Semicolon => ";",
                 Token::LParen => "(",
                 Token::RParen => ")",
@@ -32,9 +34,12 @@ impl fmt::Display for Token {
                 Token::Let => "let",
                 Token::True => "true",
                 Token::False => "false",
+                Token::Null => "null",
                 Token::If => "if",
                 Token::Else => "else",
                 Token::Return => "return",
+                Token::LBracket => "[",
+                Token::RBracket => "]",
             }
         )
     }
