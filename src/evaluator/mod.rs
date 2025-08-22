@@ -850,4 +850,22 @@ sum([1, 2, 3, 4, 5]);
 
         Ok(())
     }
+
+    #[test]
+    fn string_escape_sequences() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            (r#""hello\nworld""#, Object::String("hello\nworld".to_string())),
+            (r#""tab\there""#, Object::String("tab\there".to_string())),
+            (r#""quote\"here""#, Object::String("quote\"here".to_string())),
+            (r#""backslash\\here""#, Object::String("backslash\\here".to_string())),
+            (r#""multiple\n\t\"\\\r""#, Object::String("multiple\n\t\"\\\r".to_string())),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected);
+        }
+
+        Ok(())
+    }
 }

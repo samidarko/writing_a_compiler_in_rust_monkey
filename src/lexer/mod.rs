@@ -129,14 +129,40 @@ impl Lexer {
         }
     }
     pub fn read_string(&mut self) -> String {
-        let position = self.position + 1;
+        let mut result = String::new();
+        
         loop {
             self.read_char();
             if self.ch == '"' || self.ch == '\0' {
                 break;
             }
+            
+            if self.ch == '\\' {
+                // Handle escape sequences
+                self.read_char();
+                match self.ch {
+                    'n' => result.push('\n'),
+                    't' => result.push('\t'),
+                    'r' => result.push('\r'),
+                    '\\' => result.push('\\'),
+                    '"' => result.push('"'),
+                    '\0' => {
+                        // Unterminated escape sequence at EOF
+                        result.push('\\');
+                        break;
+                    }
+                    _ => {
+                        // Unknown escape sequence, treat literally
+                        result.push('\\');
+                        result.push(self.ch);
+                    }
+                }
+            } else {
+                result.push(self.ch);
+            }
         }
-        String::from_iter(&self.input[position..self.position])
+        
+        result
     }
 }
 
@@ -316,6 +342,44 @@ if (5 < 10) {
             RBrace,
             Semicolon,
             EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_escape_sequences() -> Result<()> {
+        let input = r#""hello\nworld\t\"test\"\\";"#;
+        let expectations: Vec<Token> = Vec::from([
+            String("hello\nworld\t\"test\"\\".to_string()),
+            Semicolon,
+            EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_unknown_escape_sequences() -> Result<()> {
+        let input = r#""hello\xworld\z";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("hello\\xworld\\z".to_string()),
+            Token::Semicolon,
+            Token::EoF,
         ]);
         let mut lexer = Lexer::new(input.chars().collect());
         let mut tok;
