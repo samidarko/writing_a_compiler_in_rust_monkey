@@ -30,7 +30,7 @@
 //! // Use an environment
 //! let env = Environment::new();
 //! env.borrow_mut().set("x", &number);
-//! 
+//!
 //! assert_eq!(env.borrow().get("x"), Some(number));
 //! ```
 

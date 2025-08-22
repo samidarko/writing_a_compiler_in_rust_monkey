@@ -25,7 +25,7 @@
 //! let program = parser.parse().map_err(|e| e.to_string())?;
 //! let environment = Environment::new();
 //! let result = eval(Node::Program(program), environment)?;
-//! 
+//!
 //! println!("Result: {}", result);
 //! # Ok::<(), String>(())
 //! ```
@@ -55,7 +55,7 @@
 //! ```
 
 pub mod ast;
-pub mod evaluator;  
+pub mod evaluator;
 pub mod lexer;
 pub mod object;
 pub mod parser;

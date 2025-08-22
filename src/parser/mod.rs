@@ -103,7 +103,7 @@ pub type Result<T> = result::Result<T, ParserError>;
 /// let lexer = Lexer::new(input.chars().collect());
 /// let mut parser = Parser::new(lexer).unwrap();
 /// let program = parser.parse().unwrap();
-/// 
+///
 /// println!("Parsed {} statements", program.statements.len());
 /// ```
 pub struct Parser {
@@ -512,11 +512,13 @@ impl Parser {
         // Function parameters must be identifiers
         match &self.current {
             Token::Ident(name) => parameters.push(name.clone()),
-            _ => return Err(ParserError::UnexpectedToken(UnexpectedToken {
-                want: "identifier".to_string(),
-                got: format!("{}", self.current),
-                position: self.current_position.clone(),
-            })),
+            _ => {
+                return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                    want: "identifier".to_string(),
+                    got: format!("{}", self.current),
+                    position: self.current_position.clone(),
+                }))
+            }
         }
 
         while self.peek == Token::Comma {
@@ -524,11 +526,13 @@ impl Parser {
             self.next_token()?;
             match &self.current {
                 Token::Ident(name) => parameters.push(name.clone()),
-                _ => return Err(ParserError::UnexpectedToken(UnexpectedToken {
-                    want: "identifier".to_string(),
-                    got: format!("{}", self.current),
-                    position: self.current_position.clone(),
-                })),
+                _ => {
+                    return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                        want: "identifier".to_string(),
+                        got: format!("{}", self.current),
+                        position: self.current_position.clone(),
+                    }))
+                }
             }
         }
 
@@ -582,7 +586,7 @@ impl Parser {
     /// let lexer = Lexer::new(input.chars().collect());
     /// let mut parser = Parser::new(lexer).unwrap();
     /// let program = parser.parse().unwrap();
-    /// 
+    ///
     /// assert_eq!(program.statements.len(), 4);
     /// ```
     pub fn parse(&mut self) -> Result<ast::Program> {

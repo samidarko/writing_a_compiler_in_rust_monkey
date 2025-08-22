@@ -37,14 +37,20 @@ use std::{num, result};
 pub struct Position {
     /// Line number (1-indexed)
     pub line: usize,
-    /// Column number (1-indexed) 
+    /// Column number (1-indexed)
     pub column: usize,
+}
+
+impl Default for Position {
+    fn default() -> Self {
+        Self { line: 1, column: 1 }
+    }
 }
 
 impl Position {
     /// Creates a new position at line 1, column 1.
     pub fn new() -> Self {
-        Self { line: 1, column: 1 }
+        Self::default()
     }
 }
 
@@ -72,7 +78,7 @@ pub type Result<T> = result::Result<T, LexerError>;
 /// use monkey_interpreter_rs::token::Token;
 ///
 /// let mut lexer = Lexer::new("5 + 10".chars().collect());
-/// 
+///
 /// assert_eq!(lexer.next_token().unwrap(), Token::Int(5));
 /// assert_eq!(lexer.next_token().unwrap(), Token::Plus);  
 /// assert_eq!(lexer.next_token().unwrap(), Token::Int(10));
@@ -92,14 +98,14 @@ impl Lexer {
     /// Creates a new lexer from a vector of characters.
     ///
     /// # Arguments
-    /// 
+    ///
     /// * `input` - The source code as a vector of characters
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use monkey_interpreter_rs::lexer::Lexer;
-    /// 
+    ///
     /// let lexer = Lexer::new("let x = 5;".chars().collect());
     /// ```
     pub fn new(input: Vec<char>) -> Self {
@@ -125,15 +131,15 @@ impl Lexer {
     }
 
     /// Retrieves the content of a specific line.
-    /// 
+    ///
     /// Used for enhanced error reporting to show the problematic line.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `line_number` - The line number to retrieve (1-indexed)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The content of the specified line, or an empty string if the line doesn't exist.
     #[allow(dead_code)]
     pub fn get_line_content(&self, line_number: usize) -> String {
@@ -156,20 +162,20 @@ impl Lexer {
     }
 
     /// Advances the lexer and returns the next token.
-    /// 
+    ///
     /// This is the main method of the lexer. It processes the current character(s)
     /// and returns the corresponding token. Comments are automatically skipped.
     ///
     /// # Returns
-    /// 
+    ///
     /// The next token in the input stream, or an error if invalid syntax is encountered.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use monkey_interpreter_rs::lexer::Lexer;
     /// use monkey_interpreter_rs::token::Token;
-    /// 
+    ///
     /// let mut lexer = Lexer::new("42".chars().collect());
     /// assert_eq!(lexer.next_token().unwrap(), Token::Int(42));
     /// assert_eq!(lexer.next_token().unwrap(), Token::EoF);

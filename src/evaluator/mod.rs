@@ -14,7 +14,7 @@
 //!
 //! The evaluator is split into focused submodules:
 //! - `statements` - Handles executable statements (let, return, blocks)
-//! - `expressions` - Handles value-producing expressions 
+//! - `expressions` - Handles value-producing expressions
 //! - `operators` - Handles prefix and infix operators
 //! - `builtins` - Provides built-in functions (len, first, etc.)
 //!
@@ -29,7 +29,7 @@
 //! let mut parser = Parser::new(lexer).unwrap();
 //! let program = parser.parse().unwrap();
 //! let env = Environment::new();
-//! 
+//!
 //! let result = eval(Node::Program(program), env).unwrap();
 //! assert_eq!(format!("{}", result), "15");
 //! ```
@@ -58,7 +58,7 @@ pub type Result<T> = result::Result<T, String>;
 /// appropriate evaluation function based on the node type.
 ///
 /// # Arguments
-/// 
+///
 /// * `node` - The AST node to evaluate
 /// * `environment` - The evaluation environment containing variable bindings
 ///
@@ -77,7 +77,7 @@ pub type Result<T> = result::Result<T, String>;
 /// let mut parser = Parser::new(lexer).unwrap();
 /// let program = parser.parse().unwrap();
 /// let env = Environment::new();
-/// 
+///
 /// let result = eval(Node::Program(program), env).unwrap();
 /// println!("Result: {}", result); // Output: Result: 8
 /// ```

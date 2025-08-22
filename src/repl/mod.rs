@@ -16,7 +16,7 @@
 //!
 //! ```no_run
 //! use monkey_interpreter_rs::repl::repl;
-//! 
+//!
 //! // Start the REPL
 //! let exit_code = repl().expect("REPL failed");
 //! println!("REPL exited with code: {}", exit_code);
@@ -53,7 +53,7 @@ use std::rc::Rc;
 ///
 /// ```no_run
 /// use monkey_interpreter_rs::repl::repl;
-/// 
+///
 /// match repl() {
 ///     Ok(0) => println!("Clean exit"),
 ///     Ok(code) => println!("Exited with code {}", code),
