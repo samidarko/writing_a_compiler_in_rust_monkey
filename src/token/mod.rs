@@ -3,7 +3,6 @@ mod from;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Token {
-    Illegal(char),
     EoF,
 
     // Identifiers + literals

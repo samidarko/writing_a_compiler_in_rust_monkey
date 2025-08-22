@@ -3,17 +3,33 @@ mod fmt;
 use crate::token::Token;
 use std::{num, result};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Position {
+    pub line: usize,
+    pub column: usize,
+}
+
+impl Position {
+    pub fn new() -> Self {
+        Self { line: 1, column: 1 }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LexerError {
-    IllegalInteger(num::ParseIntError),
+    IllegalInteger(num::ParseIntError, Position),
+    IllegalCharacter(char, Position),
 }
 pub type Result<T> = result::Result<T, LexerError>;
 
 pub struct Lexer {
     input: Vec<char>,
-    position: usize,      // current position in input (points to current char)
-    read_position: usize, // current reading position in input (after current char)
-    ch: char,             // current char under examination
+    position: usize,         // current position in input (points to current char)
+    read_position: usize,    // current reading position in input (after current char)
+    ch: char,                // current char under examination
+    line: usize,             // current line number (1-indexed)
+    column: usize,           // current column number (1-indexed)
+    line_starts: Vec<usize>, // indices where each line starts
 }
 
 impl Lexer {
@@ -23,9 +39,39 @@ impl Lexer {
             position: 0,
             read_position: 0,
             ch: '\0',
+            line: 1,
+            column: 0,            // Will be incremented to 1 by first read_char call
+            line_starts: vec![0], // First line starts at index 0
         };
         lexer.read_char();
         lexer
+    }
+
+    pub fn current_position(&self) -> Position {
+        Position {
+            line: self.line,
+            column: self.column,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_line_content(&self, line_number: usize) -> String {
+        if line_number == 0 || line_number > self.line_starts.len() {
+            return String::new();
+        }
+
+        let line_index = line_number - 1; // Convert to 0-based index
+        let start = self.line_starts[line_index];
+
+        let end = if line_index + 1 < self.line_starts.len() {
+            // Not the last line - end before the next line's start
+            self.line_starts[line_index + 1].saturating_sub(1) // Subtract 1 to exclude the newline
+        } else {
+            // Last line - end at input length
+            self.input.len()
+        };
+
+        String::from_iter(&self.input[start..end])
     }
 
     pub fn next_token(&mut self) -> Result<Token> {
@@ -77,7 +123,12 @@ impl Lexer {
             _ if self.ch.is_ascii_digit() => {
                 return self.read_number();
             }
-            _ => Token::Illegal(self.ch),
+            _ => {
+                return Err(LexerError::IllegalCharacter(
+                    self.ch,
+                    self.current_position(),
+                ));
+            }
         };
 
         self.read_char();
@@ -96,6 +147,19 @@ impl Lexer {
         } else {
             self.ch = self.input[self.read_position];
         }
+
+        // Update position tracking
+        if self.position < self.input.len() && self.input[self.position] == '\n' {
+            self.line += 1;
+            self.column = 1;
+            // Record the start of the new line
+            if self.read_position < self.input.len() {
+                self.line_starts.push(self.read_position);
+            }
+        } else {
+            self.column += 1;
+        }
+
         self.position = self.read_position;
         self.read_position += 1;
     }
@@ -118,12 +182,13 @@ impl Lexer {
 
     fn read_number(&mut self) -> Result<Token> {
         let position = self.position;
+        let start_pos = self.current_position();
         while self.ch.is_ascii_digit() {
             self.read_char();
         }
         match String::from_iter(&self.input[position..self.position]).parse::<isize>() {
             Ok(value) => Ok(Token::Int(value)),
-            Err(error) => Err(LexerError::IllegalInteger(error)),
+            Err(error) => Err(LexerError::IllegalInteger(error, start_pos)),
         }
     }
     fn read_string(&mut self) -> String {
@@ -170,7 +235,7 @@ fn is_letter(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{Lexer, Result};
+    use crate::lexer::{Lexer, LexerError, Result};
     use crate::token::Token;
     use crate::token::Token::*;
 
@@ -386,6 +451,97 @@ if (5 < 10) {
             tok = lexer.next_token()?;
             assert_eq!(tok, expectation);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn position_tracking() -> Result<()> {
+        let input = "let x = 5\nlet y = 10";
+        let mut lexer = Lexer::new(input.chars().collect());
+
+        // First token: "let" at line 1, column 1
+        let token = lexer.next_token()?;
+        assert_eq!(token, Token::Let);
+
+        // Second token: "x" at line 1, column 5
+        let token = lexer.next_token()?;
+        assert_eq!(token, Token::Ident("x".to_string()));
+
+        // Skip to second line - "let"
+        lexer.next_token()?; // "="
+        lexer.next_token()?; // "5"
+        let token = lexer.next_token()?; // "let" on line 2
+        assert_eq!(token, Token::Let);
+
+        // Position should be line 2
+        let pos = lexer.current_position();
+        assert_eq!(pos.line, 2);
+        assert!(pos.column > 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn illegal_character_position() {
+        let input = "let x = @"; // @ is illegal
+        let mut lexer = Lexer::new(input.chars().collect());
+
+        // Skip valid tokens
+        lexer.next_token().unwrap(); // let
+        lexer.next_token().unwrap(); // x
+        lexer.next_token().unwrap(); // =
+
+        // This should error with position info
+        let result = lexer.next_token();
+        match result {
+            Err(LexerError::IllegalCharacter(ch, pos)) => {
+                assert_eq!(ch, '@');
+                assert_eq!(pos.line, 1);
+                assert_eq!(pos.column, 9); // @ is at column 9
+            }
+            _ => panic!("Expected IllegalCharacter error"),
+        }
+    }
+
+    #[test]
+    fn enhanced_error_messages() {
+        let input = "let x = @";
+        let mut lexer = Lexer::new(input.chars().collect());
+
+        // Skip valid tokens
+        lexer.next_token().unwrap(); // let
+        lexer.next_token().unwrap(); // x
+        lexer.next_token().unwrap(); // =
+
+        // This should produce an enhanced error message
+        let result = lexer.next_token();
+        match result {
+            Err(error) => {
+                let error_msg = format!("{}", error);
+                assert!(error_msg.contains("line 1"));
+                assert!(error_msg.contains("column 9"));
+                assert!(error_msg.contains("'@'"));
+                assert!(error_msg.contains("Unexpected character"));
+            }
+            _ => panic!("Expected error"),
+        }
+    }
+
+    #[test]
+    fn line_content_retrieval() -> Result<()> {
+        let input = "let x = 5\nlet y = 10\nlet z = 15";
+        let mut lexer = Lexer::new(input.chars().collect());
+
+        // We need to advance through the lexer to build up line_starts
+        while lexer.next_token()? != Token::EoF {
+            // Continue tokenizing to track all line starts
+        }
+
+        assert_eq!(lexer.get_line_content(1), "let x = 5");
+        assert_eq!(lexer.get_line_content(2), "let y = 10");
+        assert_eq!(lexer.get_line_content(3), "let z = 15");
+        assert_eq!(lexer.get_line_content(4), ""); // Non-existent line
 
         Ok(())
     }

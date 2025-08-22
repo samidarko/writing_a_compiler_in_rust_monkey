@@ -8,7 +8,6 @@ impl fmt::Display for Token {
             f,
             "{}",
             match self {
-                Token::Illegal(c) => return write!(f, "illegal({})", c),
                 Token::EoF => "EoF",
                 Token::Ident(value) => value,
                 Token::Int(value) => return value.fmt(f),

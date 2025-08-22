@@ -4,15 +4,37 @@ use std::fmt;
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParserError::LexerError(value) => write!(f, "ParserError::LexerError({})", value),
-            ParserError::UnexpectedToken(value) => {
-                write!(f, "ParserError::UnexpectedToken({:?})", value)
+            ParserError::LexerError(value) => {
+                writeln!(f, "Lexer error:")?;
+                write!(f, "{}", value)
             }
-            ParserError::UnexpectedInfix(value) => {
-                write!(f, "ParserError::UnexpectedInfix({})", value)
+            ParserError::UnexpectedToken(unexpected_token) => {
+                writeln!(
+                    f,
+                    "Parse error at line {}, column {}:",
+                    unexpected_token.position.line, unexpected_token.position.column
+                )?;
+                write!(
+                    f,
+                    "  Expected {} but got {}",
+                    unexpected_token.want, unexpected_token.got
+                )
             }
-            ParserError::UnexpectedPrefix(value) => {
-                write!(f, "ParserError::UnexpectedPrefix({})", value)
+            ParserError::UnexpectedInfix(token, pos) => {
+                writeln!(
+                    f,
+                    "Parse error at line {}, column {}:",
+                    pos.line, pos.column
+                )?;
+                write!(f, "  Unexpected infix operator '{}'", token)
+            }
+            ParserError::UnexpectedPrefix(token, pos) => {
+                writeln!(
+                    f,
+                    "Parse error at line {}, column {}:",
+                    pos.line, pos.column
+                )?;
+                write!(f, "  Unexpected prefix operator '{}'", token)
             }
         }
     }
@@ -22,8 +44,8 @@ impl fmt::Display for UnexpectedToken {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "UnexpectedToken {{ want: {}, got: {} }}",
-            self.want, self.got
+            "Expected {} but got {} at line {}, column {}",
+            self.want, self.got, self.position.line, self.position.column
         )
     }
 }

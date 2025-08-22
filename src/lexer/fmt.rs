@@ -5,7 +5,22 @@ use super::LexerError;
 impl Display for LexerError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            LexerError::IllegalInteger(err) => write!(f, "illegal integer number: {}", err),
+            LexerError::IllegalInteger(err, pos) => {
+                writeln!(
+                    f,
+                    "illegal integer number at line {}, column {}: {}",
+                    pos.line, pos.column, err
+                )?;
+                write!(f, "  Error occurred while parsing integer")
+            }
+            LexerError::IllegalCharacter(ch, pos) => {
+                writeln!(
+                    f,
+                    "illegal character '{}' at line {}, column {}",
+                    ch, pos.line, pos.column
+                )?;
+                write!(f, "  Unexpected character in source code")
+            }
         }
     }
 }
