@@ -45,6 +45,18 @@ The interpreter follows a traditional compiler architecture:
 
 ## Usage
 
+### Installation
+
+```bash
+# Install from crates.io (when published)
+cargo install monkey-interpreter-rs
+
+# Or build from source
+git clone https://github.com/samidarko/monkey-interpreter-rs
+cd monkey-interpreter-rs
+cargo build --release
+```
+
 ### Building and Running
 
 ```bash
@@ -53,6 +65,7 @@ cargo build
 
 # Run the interactive REPL
 cargo run
+# Or after building: ./target/release/monkey
 
 # Run tests
 cargo test

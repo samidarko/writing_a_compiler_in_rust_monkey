@@ -1,8 +1,24 @@
 [package]
-name = "writing_a_compiler_in_rust_monkey"
-version = "0.1.0"
+name = "monkey-interpreter-rs"
+version = "0.2.0"
 edition = "2021"
+authors = ["samidarko"]
+description = "A complete interpreter for the Monkey programming language implemented in Rust"
+documentation = "https://docs.rs/monkey-interpreter-rs"
+homepage = "https://github.com/samidarko/monkey-interpreter-rs"
+repository = "https://github.com/samidarko/monkey-interpreter-rs"
+license = "MIT"
+keywords = ["interpreter", "compiler", "programming-language", "monkey", "rust"]
+categories = ["compilers", "development-tools"]
+readme = "README.md"
+exclude = [".git/", "target/", "*.swp", "*.swo"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
+
+[[bin]]
+name = "monkey"
+path = "src/main.rs"
