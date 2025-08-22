@@ -45,9 +45,9 @@ pub struct BlockStatement {
 pub enum Expression {
     Identifier(String),
     String(String),
-    Boolean(bool), // TODO create a BooleanExpression struct? Or maybe reuse Token::True & Token::False?
+    Boolean(bool), // Simple literal - no need for separate struct
     Null,
-    Int(isize), // TODO create a IntExpression struct? should we change to usize because of Minus prefix?
+    Int(isize), // isize allows negative numbers; prefix minus is handled by PrefixExpression
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     If(IfExpression),
@@ -86,7 +86,7 @@ pub struct IfExpression {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FunctionLiteral {
-    pub(crate) parameters: Vec<String>, // Vec<Identifier> ?
+    pub(crate) parameters: Vec<String>, // Parameter names (identifiers)
     pub(crate) body: BlockStatement,
 }
 

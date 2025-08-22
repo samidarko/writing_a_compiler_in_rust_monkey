@@ -7,7 +7,7 @@ use crate::parser::Parser;
 use std::io::{self, Write};
 use std::rc::Rc;
 
-pub fn repl() -> Result<(), String> {
+pub fn repl() -> Result<i32, String> {
     let mut input = String::new();
 
     let mut stdout = io::stdout().lock();
@@ -30,8 +30,7 @@ pub fn repl() -> Result<(), String> {
                 if let crate::object::Object::Exit(code) = &evaluated {
                     writeln!(stdout, "Goodbye! (exit code: {})", code)
                         .map_err(|e| e.to_string())?;
-                    // todo return the status code
-                    return Ok(());
+                    return Ok(*code as i32);
                 }
 
                 writeln!(stdout, "{}", evaluated).map_err(|e| e.to_string())?;

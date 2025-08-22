@@ -27,10 +27,21 @@ impl Object {
     }
 }
 
-// TODO check Object value is not Return
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReturnValue {
     pub value: Box<Object>,
+}
+
+impl ReturnValue {
+    pub fn new(value: Object) -> Self {
+        // Prevent double-wrapping of return values
+        match value {
+            Object::Return(inner_return) => inner_return,
+            _ => ReturnValue {
+                value: Box::new(value),
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

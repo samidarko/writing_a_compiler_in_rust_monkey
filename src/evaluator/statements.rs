@@ -46,9 +46,7 @@ pub fn eval_statement(statement: Statement, environment: Env) -> Result<Object> 
         }
         Statement::Return(return_statement) => {
             let object = eval_expression(return_statement.value, environment)?;
-            Ok(Object::Return(ReturnValue {
-                value: Box::new(object),
-            }))
+            Ok(Object::Return(ReturnValue::new(object)))
         }
         Statement::Block(block_statement) => eval_block_statement(block_statement, environment),
     }

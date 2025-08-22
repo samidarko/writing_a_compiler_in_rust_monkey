@@ -410,7 +410,6 @@ impl Parser {
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<String>> {
-        // TODO should we return Vec<Identifier> ?
         let mut parameters = vec![];
 
         if self.peek == Token::RParen {
@@ -419,14 +418,27 @@ impl Parser {
         }
 
         self.next_token()?;
-        let expression = self.parse_expression(Precedence::Lowest)?;
-        parameters.push(format!("{}", expression));
+        // Function parameters must be identifiers
+        match &self.current {
+            Token::Ident(name) => parameters.push(name.clone()),
+            _ => return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                want: "identifier".to_string(),
+                got: format!("{}", self.current),
+                position: self.current_position.clone(),
+            })),
+        }
 
         while self.peek == Token::Comma {
             self.next_token()?;
             self.next_token()?;
-            let expression = self.parse_expression(Precedence::Lowest)?;
-            parameters.push(format!("{}", expression));
+            match &self.current {
+                Token::Ident(name) => parameters.push(name.clone()),
+                _ => return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                    want: "identifier".to_string(),
+                    got: format!("{}", self.current),
+                    position: self.current_position.clone(),
+                })),
+            }
         }
 
         self.expect_peek(Token::RParen)?;
