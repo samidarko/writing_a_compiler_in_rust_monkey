@@ -1,10 +1,4 @@
-mod ast;
-mod evaluator;
-mod lexer;
-mod object;
-mod parser;
-mod repl;
-mod token;
+use monkey_interpreter_rs::repl;
 
 fn main() -> Result<(), String> {
     println!("Hello samidarko! This is the Monkey programming language!");

@@ -1,26 +1,63 @@
+//! Abstract Syntax Tree (AST) for the Monkey programming language.
+//!
+//! This module defines the AST node types that represent parsed Monkey programs.
+//! The AST serves as the intermediate representation between parsing and evaluation.
+//!
+//! # Node Types
+//!
+//! - [`Node`] - Top-level node enum containing programs, statements, and expressions
+//! - [`Statement`] - Executable statements (let, return, expression statements)  
+//! - [`Expression`] - Value-producing expressions (literals, operators, function calls)
+//!
+//! # Examples
+//!
+//! ```
+//! use monkey_interpreter_rs::ast::{Node, Program, Statement, Expression, LetStatement};
+//!
+//! // Represents: let x = 5;
+//! let program = Program {
+//!     statements: vec![
+//!         Statement::Let(LetStatement {
+//!             name: "x".to_string(),
+//!             value: Expression::Int(5),
+//!         })
+//!     ]
+//! };
+//! ```
+
 use crate::token::Token;
 use std::collections::BTreeMap;
 
 mod fmt;
 
+/// Top-level AST node that can represent any part of a Monkey program.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
+    /// A statement node
     Statement(Statement),
+    /// An expression node
     Expression(Expression),
+    /// A complete program
     Program(Program),
 }
 
+/// A complete Monkey program consisting of a sequence of statements.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Program {
+    /// The statements that make up this program
     pub statements: Vec<Statement>,
 }
 
-// Statements
+/// Statements are executable units that don't produce values.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Statement {
+    /// An expression used as a statement
     Expression(Expression),
+    /// Variable binding statement (`let x = value;`)
     Let(LetStatement),
+    /// Return statement (`return value;`)
     Return(ReturnStatement),
+    /// Block of statements (`{ stmt1; stmt2; }`)
     Block(BlockStatement),
 }
 
@@ -40,21 +77,34 @@ pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
 
-// Expressions
+/// Expressions are units that produce values when evaluated.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expression {
+    /// Variable or function name
     Identifier(String),
+    /// String literal
     String(String),
-    Boolean(bool), // Simple literal - no need for separate struct
+    /// Boolean literal (true/false)
+    Boolean(bool),
+    /// Null literal
     Null,
-    Int(isize), // isize allows negative numbers; prefix minus is handled by PrefixExpression
+    /// Integer literal
+    Int(isize),
+    /// Prefix expression (e.g., `-x`, `!condition`)
     Prefix(PrefixExpression),
+    /// Infix expression (e.g., `a + b`, `x == y`)
     Infix(InfixExpression),
+    /// Conditional expression (`if (condition) { ... } else { ... }`)
     If(IfExpression),
+    /// Function literal (`fn(params) { body }`)
     Function(FunctionLiteral),
+    /// Function call (`func(args)`)
     Call(CallExpression),
+    /// Array literal (`[1, 2, 3]`)
     Array(ArrayLiteral),
+    /// Index expression (`arr[0]`, `hash["key"]`)
     Index(IndexExpression),
+    /// Hash map literal (`{"key": "value"}`)
     Hash(HashLiteral),
 }
 

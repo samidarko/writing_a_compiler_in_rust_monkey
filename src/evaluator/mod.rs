@@ -1,3 +1,39 @@
+//! Tree-walking evaluator for the Monkey programming language.
+//!
+//! This module implements a tree-walking interpreter that evaluates Monkey AST nodes
+//! and produces runtime values (Objects). The evaluator handles:
+//!
+//! - Variable binding and lookup
+//! - Function definitions and calls with closures
+//! - Built-in functions and operators
+//! - Control flow (if/else statements)
+//! - Data structures (arrays, hash maps)
+//! - Error propagation and handling
+//!
+//! # Architecture
+//!
+//! The evaluator is split into focused submodules:
+//! - `statements` - Handles executable statements (let, return, blocks)
+//! - `expressions` - Handles value-producing expressions 
+//! - `operators` - Handles prefix and infix operators
+//! - `builtins` - Provides built-in functions (len, first, etc.)
+//!
+//! # Examples
+//!
+//! ```
+//! use monkey_interpreter_rs::{evaluator::eval, ast::Node, parser::Parser, lexer::Lexer, object::environment::Environment};
+//! use std::rc::Rc;
+//!
+//! let input = "let x = 5; x + 10";
+//! let lexer = Lexer::new(input.chars().collect());
+//! let mut parser = Parser::new(lexer).unwrap();
+//! let program = parser.parse().unwrap();
+//! let env = Environment::new();
+//! 
+//! let result = eval(Node::Program(program), env).unwrap();
+//! assert_eq!(format!("{}", result), "15");
+//! ```
+
 mod builtins;
 mod expressions;
 mod operators;
@@ -13,8 +49,38 @@ pub use expressions::eval_expression;
 pub use operators::{eval_infix_expression, eval_prefix_expression};
 pub use statements::{eval_program, eval_statement};
 
+/// Result type for evaluation operations.
 pub type Result<T> = result::Result<T, String>;
 
+/// Evaluates an AST node and returns the resulting object.
+///
+/// This is the main entry point for the evaluator. It dispatches to the
+/// appropriate evaluation function based on the node type.
+///
+/// # Arguments
+/// 
+/// * `node` - The AST node to evaluate
+/// * `environment` - The evaluation environment containing variable bindings
+///
+/// # Returns
+///
+/// The evaluated result as an `Object`, or an error message if evaluation fails.
+///
+/// # Examples
+///
+/// ```
+/// use monkey_interpreter_rs::{evaluator::eval, ast::Node, parser::Parser, lexer::Lexer, object::environment::Environment};
+/// use std::rc::Rc;
+///
+/// let input = "5 + 3";
+/// let lexer = Lexer::new(input.chars().collect());
+/// let mut parser = Parser::new(lexer).unwrap();
+/// let program = parser.parse().unwrap();
+/// let env = Environment::new();
+/// 
+/// let result = eval(Node::Program(program), env).unwrap();
+/// println!("Result: {}", result); // Output: Result: 8
+/// ```
 pub fn eval(node: Node, environment: Env) -> Result<Object> {
     match node {
         Node::Statement(statement) => eval_statement(statement, Rc::clone(&environment)),

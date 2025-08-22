@@ -1,3 +1,35 @@
+//! Recursive descent parser for the Monkey programming language.
+//!
+//! This module implements a parser that converts a stream of tokens from the lexer
+//! into an Abstract Syntax Tree (AST). The parser uses:
+//!
+//! - **Recursive Descent**: Top-down parsing approach for statements
+//! - **Pratt Parsing**: Operator precedence parsing for expressions
+//! - **Two-token Lookahead**: Current token and peek token for decision making
+//! - **Comprehensive Error Reporting**: Position-aware error messages
+//!
+//! # Supported Language Features
+//!
+//! - Variable declarations (`let` statements)
+//! - Return statements  
+//! - Expression statements
+//! - All expression types (literals, operators, function calls, etc.)
+//! - Proper operator precedence and associativity
+//! - Block statements with proper scoping
+//!
+//! # Examples
+//!
+//! ```
+//! use monkey_interpreter_rs::{parser::Parser, lexer::Lexer};
+//!
+//! let input = "let x = 5 + 3; return x * 2;";
+//! let lexer = Lexer::new(input.chars().collect());
+//! let mut parser = Parser::new(lexer).unwrap();
+//! let program = parser.parse().unwrap();
+//!
+//! assert_eq!(program.statements.len(), 2);
+//! ```
+
 mod fmt;
 mod helpers;
 
@@ -8,18 +40,31 @@ use crate::{ast, lexer};
 use std::collections::BTreeMap;
 use std::{mem, result};
 
+/// Operator precedence levels for expression parsing.
+///
+/// Used by the Pratt parser to determine the order of operations.
+/// Higher precedence operators bind more tightly.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Precedence {
+    /// Lowest precedence
     Lowest,
-    Equals,      // ==
-    LessGreater, // > or <
-    Sum,         // +
-    Product,     // *
-    Prefix,      // -X or !X
-    Call,        // myFunction(X)
-    Index,       // array[index]
+    /// Equality operators (`==`, `!=`)  
+    Equals,
+    /// Comparison operators (`<`, `>`, `<=`, `>=`)
+    LessGreater,
+    /// Addition/subtraction (`+`, `-`)
+    Sum,
+    /// Multiplication/division (`*`, `/`)
+    Product,
+    /// Prefix operators (`-x`, `!x`)
+    Prefix,
+    /// Function calls (`func()`)
+    Call,
+    /// Array/hash indexing (`arr[0]`)
+    Index,
 }
 
+/// Details about an unexpected token encountered during parsing.
 #[derive(Debug)]
 pub struct UnexpectedToken {
     want: String,
@@ -27,15 +72,40 @@ pub struct UnexpectedToken {
     position: Position,
 }
 
+/// Errors that can occur during parsing.
 #[derive(Debug)]
 pub enum ParserError {
+    /// Error from the underlying lexer
     LexerError(lexer::LexerError),
+    /// Expected one token but got another
     UnexpectedToken(UnexpectedToken),
+    /// Unexpected infix operator
     UnexpectedInfix(Token, Position),
+    /// Unexpected prefix operator
     UnexpectedPrefix(Token, Position),
 }
+
+/// Result type for parser operations.
 pub type Result<T> = result::Result<T, ParserError>;
 
+/// Recursive descent parser with Pratt parsing for expressions.
+///
+/// The parser maintains two-token lookahead (current and peek tokens) to make
+/// parsing decisions. It uses recursive descent for statements and Pratt parsing
+/// for expressions to handle operator precedence correctly.
+///
+/// # Examples
+///
+/// ```
+/// use monkey_interpreter_rs::{parser::Parser, lexer::Lexer};
+///
+/// let input = "let add = fn(a, b) { a + b; };";
+/// let lexer = Lexer::new(input.chars().collect());
+/// let mut parser = Parser::new(lexer).unwrap();
+/// let program = parser.parse().unwrap();
+/// 
+/// println!("Parsed {} statements", program.statements.len());
+/// ```
 pub struct Parser {
     lexer: lexer::Lexer,
     current: Token,
@@ -44,6 +114,27 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// Creates a new parser from a lexer.
+    ///
+    /// The constructor reads the first two tokens to initialize the current
+    /// and peek token state required for two-token lookahead.
+    ///
+    /// # Arguments
+    ///
+    /// * `lexer` - The lexer to read tokens from
+    ///
+    /// # Returns
+    ///
+    /// A new parser instance, or an error if the initial tokens can't be read.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use monkey_interpreter_rs::{parser::Parser, lexer::Lexer};
+    ///
+    /// let lexer = Lexer::new("let x = 5;".chars().collect());
+    /// let parser = Parser::new(lexer).unwrap();
+    /// ```
     pub fn new(lexer: lexer::Lexer) -> Result<Self> {
         let mut parser = Self {
             current: Token::EoF,
@@ -467,6 +558,33 @@ impl Parser {
         Ok(expression)
     }
 
+    /// Parses the entire input and returns a Program AST.
+    ///
+    /// This is the main entry point for parsing. It continues parsing statements
+    /// until it reaches the end of file token, building up a complete program.
+    ///
+    /// # Returns
+    ///
+    /// A complete Program AST containing all parsed statements, or a parser error
+    /// if invalid syntax is encountered.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use monkey_interpreter_rs::{parser::Parser, lexer::Lexer};
+    ///
+    /// let input = r#"
+    ///     let x = 5;
+    ///     let y = 10;
+    ///     let add = fn(a, b) { return a + b; };
+    ///     add(x, y);
+    /// "#;
+    /// let lexer = Lexer::new(input.chars().collect());
+    /// let mut parser = Parser::new(lexer).unwrap();
+    /// let program = parser.parse().unwrap();
+    /// 
+    /// assert_eq!(program.statements.len(), 4);
+    /// ```
     pub fn parse(&mut self) -> Result<ast::Program> {
         let mut program = ast::Program::default();
 
