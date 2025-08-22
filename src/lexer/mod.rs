@@ -28,8 +28,6 @@ impl Lexer {
         lexer
     }
 
-    // TODO maybe not all methods need to be public
-
     pub fn next_token(&mut self) -> Result<Token> {
         self.skip_whitespace();
 
@@ -86,13 +84,13 @@ impl Lexer {
         Ok(tok)
     }
 
-    pub fn skip_whitespace(&mut self) {
+    fn skip_whitespace(&mut self) {
         while self.ch == ' ' || self.ch == '\t' || self.ch == '\n' || self.ch == '\r' {
             self.read_char();
         }
     }
 
-    pub fn read_char(&mut self) {
+    fn read_char(&mut self) {
         if self.read_position >= self.input.len() {
             self.ch = '\0';
         } else {
@@ -102,7 +100,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    pub fn peek_char(&self) -> char {
+    fn peek_char(&self) -> char {
         if self.read_position >= self.input.len() {
             '\0'
         } else {
@@ -110,7 +108,7 @@ impl Lexer {
         }
     }
 
-    pub fn read_identifier(&mut self) -> String {
+    fn read_identifier(&mut self) -> String {
         let position = self.position;
         while is_letter(self.ch) {
             self.read_char();
@@ -118,7 +116,7 @@ impl Lexer {
         String::from_iter(&self.input[position..self.position])
     }
 
-    pub fn read_number(&mut self) -> Result<Token> {
+    fn read_number(&mut self) -> Result<Token> {
         let position = self.position;
         while self.ch.is_ascii_digit() {
             self.read_char();
@@ -128,15 +126,15 @@ impl Lexer {
             Err(error) => Err(LexerError::IllegalInteger(error)),
         }
     }
-    pub fn read_string(&mut self) -> String {
+    fn read_string(&mut self) -> String {
         let mut result = String::new();
-        
+
         loop {
             self.read_char();
             if self.ch == '"' || self.ch == '\0' {
                 break;
             }
-            
+
             if self.ch == '\\' {
                 // Handle escape sequences
                 self.read_char();
@@ -161,12 +159,12 @@ impl Lexer {
                 result.push(self.ch);
             }
         }
-        
+
         result
     }
 }
 
-pub fn is_letter(ch: char) -> bool {
+fn is_letter(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphabetic()
 }
 

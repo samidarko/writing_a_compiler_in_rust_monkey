@@ -8,7 +8,7 @@ impl fmt::Display for Object {
             Object::Int(value) => value.fmt(f),
             Object::Boolean(value) => value.fmt(f),
             Object::String(value) => value.fmt(f),
-            Object::Builtin(_builtin_function) => write!(f, "builtin function"),
+            Object::Builtin(_builtin_function) => write!(f, "builtin function call with ()"),
             Object::Return(return_value) => return_value.value.fmt(f),
             Object::Null => write!(f, "null"),
             Object::Function(function) => {
