@@ -1,4 +1,5 @@
 mod fmt;
+mod helpers;
 
 use crate::ast::{Expression, HashLiteral};
 use crate::token::Token;
@@ -100,11 +101,11 @@ impl Parser {
     }
 
     fn current_precedence(&self) -> Precedence {
-        get_token_precedence(&self.current)
+        helpers::get_token_precedence(&self.current)
     }
 
     fn peek_precedence(&self) -> Precedence {
-        get_token_precedence(&self.peek)
+        helpers::get_token_precedence(&self.peek)
     }
 
     fn parse_identifier_name(&self) -> Result<String> {
@@ -1124,17 +1125,5 @@ return 993322;
         assert_eq!(&program.statements, &expected);
 
         Ok(())
-    }
-}
-
-fn get_token_precedence(token: &Token) -> Precedence {
-    match token {
-        Token::EQ | Token::NotEq => Precedence::Equals,
-        Token::LT | Token::GT => Precedence::LessGreater,
-        Token::Minus | Token::Plus => Precedence::Sum,
-        Token::Slash | Token::Asterisk => Precedence::Product,
-        Token::LParen => Precedence::Call,
-        Token::LBracket => Precedence::Index,
-        _ => Precedence::Lowest,
     }
 }

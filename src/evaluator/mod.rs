@@ -1,14 +1,17 @@
 mod builtins;
+mod expressions;
+mod operators;
+mod statements;
 
-use crate::ast::{BlockStatement, Expression, Node, Program, Statement};
+use crate::ast::Node;
 use crate::object::environment::Env;
-use crate::object::environment::Environment;
-use crate::object::{ArrayLiteral, HashLiteral, Object, ReturnValue};
-use crate::token::Token;
-use crate::{ast, object};
-use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::result;
+
+// Re-export public functions
+pub use expressions::eval_expression;
+pub use operators::{eval_infix_expression, eval_prefix_expression};
+pub use statements::{eval_program, eval_statement};
 
 pub type Result<T> = result::Result<T, String>;
 
@@ -20,310 +23,8 @@ pub fn eval(node: Node, environment: Env) -> Result<Object> {
     }
 }
 
-fn eval_program(program: Program, environment: Env) -> Result<Object> {
-    let mut result: Object = Object::Null;
-    for statement in program.statements {
-        let object = eval(Node::Statement(statement), Rc::clone(&environment))?;
-
-        if let Object::Return(return_value) = object {
-            return Ok(*return_value.value);
-        }
-
-        result = object;
-    }
-
-    Ok(result)
-}
-
-fn eval_block_statement(block_statement: BlockStatement, environment: Env) -> Result<Object> {
-    let mut result: Object = Object::Null;
-    for statement in block_statement.statements {
-        let object = eval(Node::Statement(statement), Rc::clone(&environment))?;
-
-        if let Object::Return(_) = object {
-            return Ok(object);
-        }
-
-        result = object;
-    }
-
-    Ok(result)
-}
-
-fn eval_statement(statement: Statement, environment: Env) -> Result<Object> {
-    match statement {
-        Statement::Expression(expression) => eval(Node::Expression(expression), environment),
-        Statement::Let(ast::LetStatement { name, value }) => {
-            let obj = eval(Node::Expression(value), Rc::clone(&environment))?;
-            environment.borrow_mut().set(&name, &obj);
-            Ok(obj)
-        }
-        Statement::Return(return_statement) => {
-            let object = eval(Node::Expression(return_statement.value), environment)?;
-            Ok(Object::Return(ReturnValue {
-                value: Box::new(object),
-            }))
-        }
-        Statement::Block(block_statement) => eval_block_statement(block_statement, environment),
-    }
-}
-
-fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Object> {
-    let object = match expression {
-        Expression::Identifier(name) => {
-            let identifier = environment.borrow().get(&name);
-            if let Some(value) = identifier {
-                return Ok(value);
-            }
-
-            if let Object::Builtin(builtin) = builtins::get_builtin(&name) {
-                return Ok(Object::Builtin(builtin));
-            }
-
-            return Err(format!("identifier not found: {}", name));
-        }
-        Expression::Boolean(value) => Object::Boolean(value),
-        Expression::Null => Object::Null,
-        Expression::String(value) => Object::String(value),
-        Expression::Int(value) => Object::Int(value),
-        Expression::Infix(infix_expression) => {
-            let right = eval(
-                Node::Expression(*infix_expression.right),
-                Rc::clone(&environment),
-            )?;
-            let left = eval(Node::Expression(*infix_expression.left), environment)?;
-            return eval_infix_expression(infix_expression.operator, left, right);
-        }
-        Expression::Prefix(pre_expression) => {
-            let right = eval(Node::Expression(*pre_expression.right), environment)?;
-            return eval_prefix_expression(pre_expression.operator, right);
-        }
-        Expression::If(if_expression) => return eval_if_expression(if_expression, environment),
-        Expression::Function(function_literal) => Object::Function(object::Function {
-            parameters: function_literal.parameters,
-            body: function_literal.body,
-            env: Rc::clone(&environment), // capture shared env
-        }),
-        Expression::Call(call_expression) => {
-            let func_obj = eval(
-                Node::Expression(*call_expression.function),
-                Rc::clone(&environment),
-            )?;
-            let args = eval_expressions(call_expression.arguments, Rc::clone(&environment))?;
-            return apply_function(func_obj, &args);
-        }
-        Expression::Array(array_literal) => {
-            let elements = eval_expressions(array_literal.elements, Rc::clone(&environment))?;
-            if elements.len() == 1 {
-                if let Object::Error(_) = elements[0] {
-                    return Ok(elements[0].clone());
-                }
-            }
-            Object::Array(ArrayLiteral { elements })
-        }
-        Expression::Index(index_expression) => {
-            let left = eval_expression(*(index_expression.left), Rc::clone(&environment))?;
-            if let Object::Error(_) = left {
-                return Ok(left);
-            }
-            let index = eval_expression(*(index_expression.index), Rc::clone(&environment))?;
-            if let Object::Error(_) = index {
-                return Ok(index);
-            }
-            return Ok(eval_index_expression(left, index));
-        }
-        Expression::Hash(hash_literal) => {
-            return eval_hash_literal(Expression::Hash(hash_literal), environment)
-        }
-    };
-    Ok(object)
-}
-
-fn eval_expressions(expressions: Vec<Expression>, environment: Env) -> Result<Vec<Object>> {
-    let mut objects = vec![];
-
-    for expression in expressions {
-        let object = eval(Node::Expression(expression), Rc::clone(&environment))?;
-        objects.push(object);
-    }
-
-    Ok(objects)
-}
-
-#[allow(clippy::mutable_key_type)]
-fn eval_hash_literal(expression: Expression, environment: Env) -> Result<Object> {
-    let mut pairs = BTreeMap::new();
-
-    if let Expression::Hash(hash_literal) = expression {
-        for (key_expression, value_expression) in hash_literal.pairs {
-            let key = eval(Node::Expression(key_expression), Rc::clone(&environment))?;
-            if let Object::Error(error) = key {
-                return Ok(Object::Error(error));
-            }
-            let value = eval(Node::Expression(value_expression), Rc::clone(&environment))?;
-            if let Object::Error(error) = value {
-                return Ok(Object::Error(error));
-            }
-            pairs.insert(key, value);
-        }
-    } else {
-        return Ok(Object::Error(format!(
-            "invalid hash literal: {}",
-            expression
-        )));
-    }
-
-    Ok(Object::Hash(HashLiteral { pairs }))
-}
-
-fn apply_function(function: Object, arguments: &[Object]) -> Result<Object> {
-    match function {
-        Object::Function(f) => {
-            let env = extended_function_environment(&f, arguments);
-            let evaluated = eval(Node::Statement(Statement::Block(f.body)), env)?;
-            Ok(unwrap_return_value(evaluated))
-        }
-        Object::Builtin(f) => Ok((f.f)(arguments)),
-        _ => Err(format!("not a function: {}", function)),
-    }
-}
-
-fn unwrap_return_value(object: Object) -> Object {
-    match object {
-        Object::Return(return_value) => *return_value.value,
-        _ => object,
-    }
-}
-
-fn extended_function_environment(function: &object::Function, arguments: &[Object]) -> Env {
-    let environment = Environment::new_enclosed_environment(Rc::clone(&function.env));
-
-    for (i, name) in function.parameters.iter().enumerate() {
-        environment.borrow_mut().set(name, &arguments[i]);
-    }
-
-    environment
-}
-
-fn eval_if_expression(if_expression: ast::IfExpression, environment: Env) -> Result<Object> {
-    let condition = eval(
-        Node::Expression(*if_expression.condition),
-        Rc::clone(&environment),
-    )?;
-
-    if is_truthy(condition) {
-        eval(
-            Node::Statement(Statement::Block(if_expression.consequence)),
-            environment,
-        )
-    } else if let Some(alternative) = if_expression.alternative {
-        eval(Node::Statement(Statement::Block(alternative)), environment)
-    } else {
-        Ok(Object::Null)
-    }
-}
-
-fn is_truthy(object: Object) -> bool {
-    !matches!(object, Object::Null | Object::Boolean(false))
-}
-
-fn eval_bang_operator_expression(right: Object) -> Object {
-    match right {
-        Object::Boolean(true) => Object::Boolean(false),
-        Object::Boolean(false) => Object::Boolean(true),
-        Object::Null => Object::Boolean(true),
-        _ => Object::Boolean(false),
-    }
-}
-
-fn eval_minus_operator_expression(right: Object) -> Result<Object> {
-    match right {
-        Object::Int(value) => Ok(Object::Int(-value)),
-        _ => Err(format!("unknown operator: -{}", right)),
-    }
-}
-
-fn eval_prefix_expression(operator: Token, right: Object) -> Result<Object> {
-    match operator {
-        Token::Bang => Ok(eval_bang_operator_expression(right)),
-        Token::Minus => eval_minus_operator_expression(right),
-        _ => Err(format!("unknown operator: {}{}", operator, right)),
-    }
-}
-fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Result<Object> {
-    let object = match (&operator, &left, &right) {
-        (_, Object::Int(_), Object::Int(_)) => {
-            return eval_integer_infix_expression(operator, left, right)
-        }
-        (Token::EQ, _, _) => Object::Boolean(left == right),
-        (Token::NotEq, _, _) => Object::Boolean(left != right),
-        (_, Object::String(_), Object::String(_)) => {
-            eval_string_infix_expression(operator, left, right)?
-        }
-        (_, left, right) if !left.is_same_variant(right) => {
-            return Err(format!("type mismatch: {} {} {}", left, operator, right))
-        }
-        _ => return Err(format!("unknown operator: {} {} {}", left, operator, right)),
-    };
-    Ok(object)
-}
-
-fn eval_integer_infix_expression(operator: Token, left: Object, right: Object) -> Result<Object> {
-    let object = match (&operator, &left, &right) {
-        (Token::Plus, Object::Int(left), Object::Int(right)) => Object::Int(left + right),
-        (Token::Minus, Object::Int(left), Object::Int(right)) => Object::Int(left - right),
-        (Token::Asterisk, Object::Int(left), Object::Int(right)) => Object::Int(left * right),
-        (Token::Slash, Object::Int(left), Object::Int(right)) => Object::Int(left / right),
-        (Token::LT, Object::Int(left), Object::Int(right)) => Object::Boolean(left < right),
-        (Token::GT, Object::Int(left), Object::Int(right)) => Object::Boolean(left > right),
-        (Token::EQ, Object::Int(left), Object::Int(right)) => Object::Boolean(left == right),
-        (Token::NotEq, Object::Int(left), Object::Int(right)) => Object::Boolean(left != right),
-        _ => {
-            return Err(format!(
-                "unknown operator: {} {} {}",
-                &left, &operator, &right
-            ))
-        }
-    };
-    Ok(object)
-}
-
-fn eval_string_infix_expression(operator: Token, left: Object, right: Object) -> Result<Object> {
-    if operator != Token::Plus {
-        return Err(format!(
-            "unknown operator: {} {} {}",
-            &left, &operator, &right
-        ));
-    }
-
-    let left_value = left.to_string();
-    let right_value = right.to_string();
-    let object = Object::String(left_value + &right_value);
-    Ok(object)
-}
-
-fn eval_index_expression(left: Object, index: Object) -> Object {
-    match (left, index) {
-        (Object::Array(array_literal), Object::Int(index)) => {
-            let max = (array_literal.elements.len() - 1) as isize;
-
-            if index < 0 || index > max {
-                return Object::Error(format!("index out of range: {}", index));
-            }
-            array_literal.elements[index as usize].clone()
-        }
-        (Object::Hash(hash_literal), key) => match key {
-            Object::Int(_) | Object::Boolean(_) | Object::String(_) => {
-                if let Some(object) = hash_literal.pairs.get(&key) {
-                    return object.clone();
-                }
-                Object::Null
-            }
-            _ => Object::Error(format!("unusable as hash key: {}", key)),
-        },
-        (left, _) => Object::Error(format!("index operator isn't supported: {}", left)),
-    }
-}
+// Re-export Object for convenience
+pub use crate::object::Object;
 
 #[cfg(test)]
 mod tests {
@@ -463,9 +164,9 @@ mod tests {
             ),
             (
                 "let f = fn(x) {
-   let result = x + 10;
-   return result;
-   return 10;
+  let result = x + 10;
+  return result;
+  return 10;
 };
 f(10);",
                 Object::Int(20),

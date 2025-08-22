@@ -1,0 +1,88 @@
+use crate::object::Object;
+use crate::token::Token;
+
+use super::Result;
+
+pub fn eval_bang_operator_expression(right: Object) -> Object {
+    match right {
+        Object::Boolean(true) => Object::Boolean(false),
+        Object::Boolean(false) => Object::Boolean(true),
+        Object::Null => Object::Boolean(true),
+        _ => Object::Boolean(false),
+    }
+}
+
+pub fn eval_minus_operator_expression(right: Object) -> Result<Object> {
+    match right {
+        Object::Int(value) => Ok(Object::Int(-value)),
+        _ => Err(format!("unknown operator: -{}", right)),
+    }
+}
+
+pub fn eval_prefix_expression(operator: Token, right: Object) -> Result<Object> {
+    match operator {
+        Token::Bang => Ok(eval_bang_operator_expression(right)),
+        Token::Minus => eval_minus_operator_expression(right),
+        _ => Err(format!("unknown operator: {}{}", operator, right)),
+    }
+}
+
+pub fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Result<Object> {
+    let object = match (&operator, &left, &right) {
+        (_, Object::Int(_), Object::Int(_)) => {
+            return eval_integer_infix_expression(operator, left, right)
+        }
+        (Token::EQ, _, _) => Object::Boolean(left == right),
+        (Token::NotEq, _, _) => Object::Boolean(left != right),
+        (_, Object::String(_), Object::String(_)) => {
+            eval_string_infix_expression(operator, left, right)?
+        }
+        (_, left, right) if !left.is_same_variant(right) => {
+            return Err(format!("type mismatch: {} {} {}", left, operator, right))
+        }
+        _ => return Err(format!("unknown operator: {} {} {}", left, operator, right)),
+    };
+    Ok(object)
+}
+
+pub fn eval_integer_infix_expression(
+    operator: Token,
+    left: Object,
+    right: Object,
+) -> Result<Object> {
+    let object = match (&operator, &left, &right) {
+        (Token::Plus, Object::Int(left), Object::Int(right)) => Object::Int(left + right),
+        (Token::Minus, Object::Int(left), Object::Int(right)) => Object::Int(left - right),
+        (Token::Asterisk, Object::Int(left), Object::Int(right)) => Object::Int(left * right),
+        (Token::Slash, Object::Int(left), Object::Int(right)) => Object::Int(left / right),
+        (Token::LT, Object::Int(left), Object::Int(right)) => Object::Boolean(left < right),
+        (Token::GT, Object::Int(left), Object::Int(right)) => Object::Boolean(left > right),
+        (Token::EQ, Object::Int(left), Object::Int(right)) => Object::Boolean(left == right),
+        (Token::NotEq, Object::Int(left), Object::Int(right)) => Object::Boolean(left != right),
+        _ => {
+            return Err(format!(
+                "unknown operator: {} {} {}",
+                &left, &operator, &right
+            ))
+        }
+    };
+    Ok(object)
+}
+
+pub fn eval_string_infix_expression(
+    operator: Token,
+    left: Object,
+    right: Object,
+) -> Result<Object> {
+    if operator != Token::Plus {
+        return Err(format!(
+            "unknown operator: {} {} {}",
+            &left, &operator, &right
+        ));
+    }
+
+    let left_value = left.to_string();
+    let right_value = right.to_string();
+    let object = Object::String(left_value + &right_value);
+    Ok(object)
+}
