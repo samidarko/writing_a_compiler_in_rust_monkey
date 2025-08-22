@@ -22,11 +22,14 @@ The Monkey interpreter supports:
 
 - **Variables** with `let` statements
 - **Data types**: integers, booleans, strings, arrays, and hash maps
-- **Arithmetic and comparison operators**
+- **Operators**: arithmetic (`+`, `-`, `*`, `/`), comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`), logical (`&&`, `||`), and unary (`!`, `-`)
 - **Functions** with closures and first-class support
 - **Conditionals** (`if`/`else` expressions)
 - **Built-in functions**: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`
 - **Array indexing** and hash map access
+- **Comments**: single-line (`//`) and multi-line (`/* */`)
+- **String escape sequences**: `\n`, `\t`, `\"`, `\\`, `\r`
+- **Enhanced error reporting** with line/column position tracking
 - **Interactive REPL** for live programming
 
 ## Architecture
@@ -61,7 +64,7 @@ cargo test -- --nocapture
 ### Example Monkey Code
 
 ```monkey
-# Variables and functions
+// Variables and functions
 let fibonacci = fn(x) {
   if (x == 0) {
     0
@@ -76,7 +79,7 @@ let fibonacci = fn(x) {
 
 fibonacci(10);
 
-# Arrays and higher-order functions
+// Arrays and higher-order functions  
 let map = fn(arr, f) {
   let iter = fn(arr, accumulated) {
     if (len(arr) == 0) {
@@ -90,14 +93,24 @@ let map = fn(arr, f) {
 
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2; };
-map(a, double); # [2, 4, 6, 8]
+map(a, double); // [2, 4, 6, 8]
 
-# Hash maps
+/* Multi-line comments 
+   are also supported */
 let person = {"name": "Alice", "age": 30};
-person["name"]; # "Alice"
+person["name"]; // "Alice"
 
-# Exit the REPL
-exit(); # or exit(42) for custom exit code
+// Enhanced comparison and logical operators
+let adult = person["age"] >= 18 && person["name"] != "";
+if (adult) {
+    puts("Person is an adult named: " + person["name"]);
+}
+
+// String with escape sequences
+puts("Hello\nWorld!\tTab\tSeparated\"Quote\"");
+
+// Exit the REPL
+exit(); // or exit(42) for custom exit code
 ```
 
 ## Built-in Functions
@@ -139,18 +152,29 @@ cargo fmt
 
 ## Implementation Highlights
 
+### Recent Enhancements
+
+- **Enhanced Error Reporting**: Comprehensive error messages with line/column position tracking and contextual information
+- **Extended Operator Support**: Added comparison operators (`<=`, `>=`) and logical operators (`&&`, `||`)
+- **Comment Support**: Full single-line (`//`) and multi-line (`/* */`) comment parsing
+- **String Escape Sequences**: Support for common escape sequences (`\n`, `\t`, `\"`, `\\`, `\r`)
+- **Modular Architecture**: Split large files into logical modules for better maintainability
+- **Comprehensive Testing**: 58+ tests covering all features including edge cases and error conditions
+
 ### Rust-Specific Design Choices
 
 - **Error Handling**: Uses `Result` types throughout for proper error propagation
 - **Memory Management**: Uses `Rc<RefCell<>>` for shared environment references in closures
 - **Pattern Matching**: Leverages Rust's powerful pattern matching for AST evaluation
 - **Type Safety**: Rust's type system catches many interpreter bugs at compile time
+- **Position Tracking**: Detailed source position tracking for enhanced debugging experience
 
 ### Architecture Benefits
 
-- **Separation of Concerns**: Each phase (lexing, parsing, evaluation) is cleanly separated
+- **Separation of Concerns**: Each phase (lexing, parsing, evaluation) is cleanly separated into modules
 - **Extensibility**: Easy to add new language features by extending the AST and evaluator
-- **Testing**: Comprehensive test suite covering all language features
+- **Testing**: Comprehensive test suite covering all language features and error conditions
+- **Error Quality**: Professional-quality error messages that help users identify and fix issues quickly
 - **Performance**: Tree-walking interpreter optimized for clarity over speed
 
 ## Learning Outcomes

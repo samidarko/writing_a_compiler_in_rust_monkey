@@ -40,6 +40,8 @@ mod tests {
 
     fn test_eval(input: &str) -> Result<Object> {
         let lexer = Lexer::new(input.chars().collect());
+        // let mut parser = Parser::new(lexer)?;
+        // let program = parser.parse()?;
         let mut parser = Parser::new(lexer).expect("a new parser to be created");
         let program = parser.parse().expect("the parse function to be successful");
         let environment = Environment::new();
@@ -84,6 +86,12 @@ mod tests {
             ("1 > 2", Object::Boolean(false)),
             ("1 < 1", Object::Boolean(false)),
             ("1 > 1", Object::Boolean(false)),
+            ("1 <= 2", Object::Boolean(true)),
+            ("1 >= 2", Object::Boolean(false)),
+            ("1 <= 1", Object::Boolean(true)),
+            ("1 >= 1", Object::Boolean(true)),
+            ("2 <= 1", Object::Boolean(false)),
+            ("1 >= 2", Object::Boolean(false)),
             ("1 == 1", Object::Boolean(true)),
             ("1 != 1", Object::Boolean(false)),
             ("1 == 2", Object::Boolean(false)),

@@ -210,7 +210,7 @@ impl Parser {
     fn infix_parse(&mut self, left: ast::Expression) -> Result<ast::Expression> {
         use crate::token::Token::*;
         match &self.current {
-            Plus | Minus | Slash | Asterisk | EQ | NotEq | LT | GT => {
+            Plus | Minus | Slash | Asterisk | Eq | NotEq | Lt | Gt | Lte | Gte => {
                 self.parse_infix_expression(left)
             }
             LParen => self.parse_call_expression(left),
@@ -811,7 +811,7 @@ return 993322;
                 "5 > 5;",
                 ast::InfixExpression {
                     left: Box::new(ast::Expression::Int(5)),
-                    operator: Token::GT,
+                    operator: Token::Gt,
                     right: Box::new(ast::Expression::Int(5)),
                 },
             ),
@@ -819,7 +819,7 @@ return 993322;
                 "5 < 5;",
                 ast::InfixExpression {
                     left: Box::new(ast::Expression::Int(5)),
-                    operator: Token::LT,
+                    operator: Token::Lt,
                     right: Box::new(ast::Expression::Int(5)),
                 },
             ),
@@ -827,7 +827,7 @@ return 993322;
                 "5 == 5;",
                 ast::InfixExpression {
                     left: Box::new(ast::Expression::Int(5)),
-                    operator: Token::EQ,
+                    operator: Token::Eq,
                     right: Box::new(ast::Expression::Int(5)),
                 },
             ),
@@ -843,7 +843,7 @@ return 993322;
                 "true == true",
                 ast::InfixExpression {
                     left: Box::new(ast::Expression::Boolean(true)),
-                    operator: Token::EQ,
+                    operator: Token::Eq,
                     right: Box::new(ast::Expression::Boolean(true)),
                 },
             ),
@@ -859,7 +859,7 @@ return 993322;
                 "false == false",
                 ast::InfixExpression {
                     left: Box::new(ast::Expression::Boolean(false)),
-                    operator: Token::EQ,
+                    operator: Token::Eq,
                     right: Box::new(ast::Expression::Boolean(false)),
                 },
             ),
@@ -962,7 +962,7 @@ return 993322;
                             ast::IfExpression {
                                 condition: Box::new(ast::Expression::Infix(ast::InfixExpression {
                                     left: Box::new(ast::Expression::Identifier("x".to_string())),
-                                    operator: Token::GT,
+                                    operator: Token::Gt,
                                     right: Box::new(ast::Expression::Int(100)),
                                 })),
                                 consequence: ast::BlockStatement {

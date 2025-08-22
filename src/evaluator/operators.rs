@@ -32,7 +32,7 @@ pub fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Re
         (_, Object::Int(_), Object::Int(_)) => {
             return eval_integer_infix_expression(operator, left, right)
         }
-        (Token::EQ, _, _) => Object::Boolean(left == right),
+        (Token::Eq, _, _) => Object::Boolean(left == right),
         (Token::NotEq, _, _) => Object::Boolean(left != right),
         (_, Object::String(_), Object::String(_)) => {
             eval_string_infix_expression(operator, left, right)?
@@ -55,9 +55,11 @@ pub fn eval_integer_infix_expression(
         (Token::Minus, Object::Int(left), Object::Int(right)) => Object::Int(left - right),
         (Token::Asterisk, Object::Int(left), Object::Int(right)) => Object::Int(left * right),
         (Token::Slash, Object::Int(left), Object::Int(right)) => Object::Int(left / right),
-        (Token::LT, Object::Int(left), Object::Int(right)) => Object::Boolean(left < right),
-        (Token::GT, Object::Int(left), Object::Int(right)) => Object::Boolean(left > right),
-        (Token::EQ, Object::Int(left), Object::Int(right)) => Object::Boolean(left == right),
+        (Token::Lt, Object::Int(left), Object::Int(right)) => Object::Boolean(left < right),
+        (Token::Gt, Object::Int(left), Object::Int(right)) => Object::Boolean(left > right),
+        (Token::Lte, Object::Int(left), Object::Int(right)) => Object::Boolean(left <= right),
+        (Token::Gte, Object::Int(left), Object::Int(right)) => Object::Boolean(left >= right),
+        (Token::Eq, Object::Int(left), Object::Int(right)) => Object::Boolean(left == right),
         (Token::NotEq, Object::Int(left), Object::Int(right)) => Object::Boolean(left != right),
         _ => {
             return Err(format!(

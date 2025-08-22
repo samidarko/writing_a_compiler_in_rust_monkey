@@ -80,7 +80,7 @@ impl Lexer {
         let tok = match self.ch {
             '=' if self.peek_char() == '=' => {
                 self.read_char();
-                Token::EQ
+                Token::Eq
             }
             '=' => Token::Assign,
             '+' => Token::Plus,
@@ -90,10 +90,34 @@ impl Lexer {
                 Token::NotEq
             }
             '!' => Token::Bang,
+            '/' if self.peek_char() == '/' => {
+                self.skip_single_line_comment();
+                return self.next_token(); // Recursively get the next token
+            }
+            '/' if self.peek_char() == '*' => {
+                self.skip_multi_line_comment()?;
+                return self.next_token(); // Recursively get the next token
+            }
             '/' => Token::Slash,
             '*' => Token::Asterisk,
-            '<' => Token::LT,
-            '>' => Token::GT,
+            '<' if self.peek_char() == '=' => {
+                self.read_char();
+                Token::Lte
+            }
+            '<' => Token::Lt,
+            '>' if self.peek_char() == '=' => {
+                self.read_char();
+                Token::Gte
+            }
+            '>' => Token::Gt,
+            '&' if self.peek_char() == '&' => {
+                self.read_char();
+                Token::And
+            }
+            '|' if self.peek_char() == '|' => {
+                self.read_char();
+                Token::Or
+            }
             ';' => Token::Semicolon,
             ',' => Token::Comma,
             ':' => Token::Colon,
@@ -227,6 +251,38 @@ impl Lexer {
 
         result
     }
+
+    fn skip_single_line_comment(&mut self) {
+        // Skip the '//' characters
+        self.read_char(); // Skip first '/'
+        self.read_char(); // Skip second '/'
+
+        // Skip until end of line or EOF
+        while self.ch != '\n' && self.ch != '\0' {
+            self.read_char();
+        }
+    }
+
+    fn skip_multi_line_comment(&mut self) -> Result<()> {
+        let start_pos = self.current_position();
+
+        // Skip the '/*' characters
+        self.read_char(); // Skip '/'
+        self.read_char(); // Skip '*'
+
+        // Look for closing */
+        while self.ch != '\0' {
+            if self.ch == '*' && self.peek_char() == '/' {
+                self.read_char(); // Skip '*'
+                self.read_char(); // Skip '/'
+                return Ok(());
+            }
+            self.read_char();
+        }
+
+        // If we reach here, the comment is unterminated
+        Err(LexerError::IllegalCharacter('*', start_pos))
+    }
 }
 
 fn is_letter(ch: char) -> bool {
@@ -249,7 +305,7 @@ let add = fn(x, y) {
 };
 
 let result = add(five, ten);
-!-/*5;
+!-/ *5;
 5 < 10 > 5;
 
 if (5 < 10) {
@@ -264,7 +320,11 @@ if (5 < 10) {
 "foobar";
 "foo bar";
 [1, 2];
-{"foo": "bar"}
+{"foo": "bar"};
+10 >= 9;
+10 <= 9;
+true && false;
+true || false;
 "#;
         let expectations: Vec<Token> = Vec::from([
             Let,
@@ -310,15 +370,15 @@ if (5 < 10) {
             Int(5),
             Semicolon,
             Int(5),
-            LT,
+            Lt,
             Int(10),
-            GT,
+            Gt,
             Int(5),
             Semicolon,
             If,
             LParen,
             Int(5),
-            LT,
+            Lt,
             Int(10),
             RParen,
             LBrace,
@@ -333,7 +393,7 @@ if (5 < 10) {
             Semicolon,
             RBrace,
             Int(10),
-            EQ,
+            Eq,
             Int(10),
             Semicolon,
             Int(10),
@@ -355,6 +415,23 @@ if (5 < 10) {
             Colon,
             String("bar".to_string()),
             RBrace,
+            Semicolon,
+            Int(10),
+            Gte,
+            Int(9),
+            Semicolon,
+            Int(10),
+            Lte,
+            Int(9),
+            Semicolon,
+            True,
+            And,
+            False,
+            Semicolon,
+            True,
+            Or,
+            False,
+            Semicolon,
             EoF,
         ]);
         let mut lexer = Lexer::new(input.chars().collect());
@@ -384,7 +461,7 @@ if (5 < 10) {
             If,
             LParen,
             Ident("x".to_string()),
-            GT,
+            Gt,
             Int(100),
             RParen,
             LBrace,
@@ -542,6 +619,130 @@ if (5 < 10) {
         assert_eq!(lexer.get_line_content(2), "let y = 10");
         assert_eq!(lexer.get_line_content(3), "let z = 15");
         assert_eq!(lexer.get_line_content(4), ""); // Non-existent line
+
+        Ok(())
+    }
+
+    #[test]
+    fn single_line_comments() -> Result<()> {
+        let input = r#"let five = 5; // This is a comment
+let ten = 10; // Another comment
+// Full line comment
+let result = five + ten;"#;
+
+        let expectations: Vec<Token> = Vec::from([
+            Let,
+            Ident("five".to_string()),
+            Assign,
+            Int(5),
+            Semicolon,
+            Let,
+            Ident("ten".to_string()),
+            Assign,
+            Int(10),
+            Semicolon,
+            Let,
+            Ident("result".to_string()),
+            Assign,
+            Ident("five".to_string()),
+            Plus,
+            Ident("ten".to_string()),
+            Semicolon,
+            EoF,
+        ]);
+
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn multi_line_comments() -> Result<()> {
+        let input = r#"let five = 5;
+/* This is a 
+   multi-line comment */
+let ten = 10;
+/* Another
+   comment */ let result = five + ten;"#;
+
+        let expectations: Vec<Token> = Vec::from([
+            Let,
+            Ident("five".to_string()),
+            Assign,
+            Int(5),
+            Semicolon,
+            Let,
+            Ident("ten".to_string()),
+            Assign,
+            Int(10),
+            Semicolon,
+            Let,
+            Ident("result".to_string()),
+            Assign,
+            Ident("five".to_string()),
+            Plus,
+            Ident("ten".to_string()),
+            Semicolon,
+            EoF,
+        ]);
+
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn unterminated_multi_line_comment() {
+        let input = "let x = 5; /* This comment is not closed";
+        let mut lexer = Lexer::new(input.chars().collect());
+
+        // Skip valid tokens
+        lexer.next_token().unwrap(); // let
+        lexer.next_token().unwrap(); // x
+        lexer.next_token().unwrap(); // =
+        lexer.next_token().unwrap(); // 5
+        lexer.next_token().unwrap(); // ;
+
+        // This should error due to unterminated comment
+        let result = lexer.next_token();
+        assert!(result.is_err());
+        match result {
+            Err(LexerError::IllegalCharacter('*', _)) => {
+                // Expected error for unterminated comment
+            }
+            _ => panic!("Expected IllegalCharacter error for unterminated comment"),
+        }
+    }
+
+    #[test]
+    fn comments_with_special_characters() -> Result<()> {
+        let input = r#"// Comment with symbols: !@#$%^&*()
+/* Comment with 
+   more symbols: {}[]<>=+- */
+let x = 1;"#;
+
+        let expectations: Vec<Token> =
+            Vec::from([Let, Ident("x".to_string()), Assign, Int(1), Semicolon, EoF]);
+
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
 
         Ok(())
     }

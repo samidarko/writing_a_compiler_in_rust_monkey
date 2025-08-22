@@ -1,5 +1,4 @@
 mod fmt;
-mod from;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Token {
@@ -17,10 +16,14 @@ pub enum Token {
     Bang,
     Asterisk,
     Slash,
-    LT,
-    GT,
-    EQ,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Eq,
     NotEq,
+    And,
+    Or,
 
     // Delimiters
     Comma,
