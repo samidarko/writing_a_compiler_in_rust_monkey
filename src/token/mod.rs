@@ -100,4 +100,6 @@ pub enum Token {
     Else,
     /// Return keyword `return`
     Return,
+    /// While keyword `while`
+    While,
 }

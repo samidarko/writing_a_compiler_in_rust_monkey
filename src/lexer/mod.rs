@@ -246,6 +246,7 @@ impl Lexer {
                     "if" => Token::If,
                     "else" => Token::Else,
                     "return" => Token::Return,
+                    "while" => Token::While,
                     i => Token::Ident(i.to_string()),
                 };
                 return Ok(tok);

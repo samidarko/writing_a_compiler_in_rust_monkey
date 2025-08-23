@@ -41,6 +41,7 @@ impl fmt::Display for Token {
                 Token::If => "if",
                 Token::Else => "else",
                 Token::Return => "return",
+                Token::While => "while",
                 Token::LBracket => "[",
                 Token::RBracket => "]",
             }

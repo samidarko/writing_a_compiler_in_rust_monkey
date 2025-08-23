@@ -84,6 +84,9 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
             environment.borrow_mut().set(&assignment_expression.name, &value);
             return Ok(value.clone()); // Assignment returns the assigned value
         }
+        Expression::While(while_expression) => {
+            return eval_while_expression(while_expression, environment);
+        }
     };
     Ok(object)
 }
@@ -197,4 +200,31 @@ pub fn eval_index_expression(left: Object, index: Object) -> Object {
         },
         (left, _) => Object::Error(format!("index operator isn't supported: {}", left)),
     }
+}
+
+pub fn eval_while_expression(while_expression: ast::WhileExpression, environment: Env) -> Result<Object> {
+    let mut result = Object::Null;
+    
+    loop {
+        let condition = eval(
+            Node::Expression(*while_expression.condition.clone()),
+            Rc::clone(&environment),
+        )?;
+
+        if !is_truthy(condition) {
+            break;
+        }
+
+        result = eval(
+            Node::Statement(Statement::Block(while_expression.body.clone())),
+            Rc::clone(&environment),
+        )?;
+        
+        // Handle return values - if we encounter a return, break out of the loop
+        if matches!(result, Object::Return(_)) {
+            break;
+        }
+    }
+    
+    Ok(result)
 }

@@ -732,4 +732,79 @@ sum([1, 2, 3, 4, 5]);
 
         Ok(())
     }
+
+    #[test]
+    fn while_loops() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            // Basic while loop
+            ("let i = 0; while (i < 3) { i = i + 1; } i;", Object::Int(3)),
+            
+            // While loop with different conditions  
+            ("let x = 10; while (x > 5) { x = x - 1; } x;", Object::Int(5)),
+            
+            // While loop that doesn't execute
+            ("let j = 5; while (j < 0) { j = j + 1; } j;", Object::Int(5)),
+            
+            // While loop with accumulator
+            ("let sum = 0; let i = 1; while (i <= 3) { sum = sum + i; i = i + 1; } sum;", Object::Int(6)),
+            
+            // While loop with boolean condition
+            ("let flag = true; let count = 0; while (flag) { count = count + 1; if (count >= 2) { flag = false; } } count;", Object::Int(2)),
+            
+            // While loop that returns early
+            ("let test = fn() { let i = 0; while (i < 10) { if (i == 3) { return i; } i = i + 1; } return -1; }; test();", Object::Int(3)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected, "Input: {}", input);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn while_loop_edge_cases() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            // Empty body while loop
+            ("let x = 0; while (false) { } x;", Object::Int(0)),
+            
+            // Complex condition
+            ("let a = 1; while (a < 5) { a = a + 1; } a;", Object::Int(5)),
+            
+            // Nested variable access
+            ("let outer = 10; while (outer > 8) { let inner = 5; outer = outer - inner + 3; } outer;", Object::Int(8)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected, "Input: {}", input);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn while_loop_with_functions() -> Result<()> {
+        let input = r#"
+            let fibonacci = fn(n) {
+                let a = 0;
+                let b = 1;
+                let i = 0;
+                while (i < n) {
+                    let temp = a + b;
+                    a = b;
+                    b = temp;
+                    i = i + 1;
+                }
+                return a;
+            };
+            fibonacci(5);
+        "#;
+        
+        let evaluated = test_eval(input)?;
+        assert_eq!(evaluated, Object::Int(5)); // 5th Fibonacci number
+        
+        Ok(())
+    }
 }

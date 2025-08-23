@@ -265,6 +265,7 @@ impl Parser {
             Token::Null => Expression::Null,
             Token::LParen => return self.parse_grouped_expression(),
             Token::If => return self.parse_if_expression(),
+            Token::While => return self.parse_while_expression(),
             Token::Fn => return self.parse_function_literal(),
             Token::LBracket => return self.parse_array_literal(),
             Token::LBrace => return self.parse_hash_literal(),
@@ -394,6 +395,31 @@ impl Parser {
             condition,
             consequence,
             alternative,
+        }))
+    }
+    
+    fn parse_while_expression(&mut self) -> Result<ast::Expression> {
+        self.expect_peek(Token::LParen)?;
+
+        let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
+
+        self.expect_current(Token::RParen)?;
+        self.expect_current(Token::LBrace)?;
+
+        // Parse the body of the while block
+        let body = if let ast::Statement::Block(block) = self.parse_block_statement()? {
+            block
+        } else {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                want: "while block statement".to_string(),
+                got: format!("{}", &self.current),
+                position: self.current_position.clone(),
+            }));
+        };
+
+        Ok(ast::Expression::While(ast::WhileExpression {
+            condition,
+            body,
         }))
     }
 

@@ -74,6 +74,7 @@ impl Display for Expression {
             Expression::Index(index_expression) => index_expression.fmt(f),
             Expression::Hash(hash_literal) => hash_literal.fmt(f),
             Expression::Assignment(assignment_expression) => assignment_expression.fmt(f),
+            Expression::While(while_expression) => while_expression.fmt(f),
             Expression::Null => write!(f, "null"),
         }
     }
@@ -155,5 +156,11 @@ impl Display for HashLiteral {
 impl Display for AssignmentExpression {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{} = {}", self.name, self.value)
+    }
+}
+
+impl Display for WhileExpression {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "while {} {{ {} }}", self.condition, self.body)
     }
 }

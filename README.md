@@ -22,10 +22,10 @@ The Monkey interpreter supports:
 
 - **Variables** with `let` statements and **mutable assignment** (`variable = new_value`)
 - **Data types**: integers, booleans, strings, arrays, and hash maps
-- **Type casting**: `int()` and `string()` builtin functions for type conversion
+- **Control flow**: `if`/`else` conditionals and **`while` loops** for iteration
+- **Type casting**: `int()` and enhanced `string()` builtin functions for type conversion
 - **Operators**: arithmetic (`+`, `-`, `*`, `/`), comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`), logical (`&&`, `||`), and unary (`!`, `-`)
 - **Functions** with closures and first-class support
-- **Conditionals** (`if`/`else` expressions)
 - **Built-in functions**: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`, `int`, `string`
 - **Array indexing** and hash map access
 - **Comments**: single-line (`//`) and multi-line (`/* */`)
@@ -69,6 +69,7 @@ cargo run
 
 # Run a Monkey program file
 cargo run -- examples/fibonacci.monkey
+cargo run -- examples/while_loops.monkey
 
 # Run tests
 cargo test
@@ -87,10 +88,12 @@ cargo bench
 let x = 5;
 x = x + 10;  // x is now 15
 
-// Type casting with new builtin functions
+// Type casting with builtin functions
 let num_str = "42";
-let num = int(num_str);    // Convert string to integer
-let result = string(num);  // Convert back to string
+let num = int(num_str);      // Convert string to integer
+let result = string(num);    // Convert back to string
+let arr_str = string([1,2]); // Convert array to string: "[1, 2]"
+let hash_str = string({"key": "value"}); // Convert hash to string
 
 // Variables and functions
 let fibonacci = fn(x) {
@@ -106,6 +109,14 @@ let fibonacci = fn(x) {
 };
 
 fibonacci(10);
+
+// While loops for iteration
+let i = 0;
+let sum = 0;
+while (i < 10) {
+    sum = sum + i;
+    i = i + 1;
+}
 
 // Arrays and higher-order functions  
 let map = fn(arr, f) {
@@ -154,7 +165,7 @@ exit(); // or exit(42) for custom exit code
 
 ### Type Conversion Functions  
 - `int(string)` - Converts a string to an integer
-- `string(integer)` - Converts an integer to a string
+- `string(value)` - Converts integers, arrays, hash maps, booleans, null, or strings to string representation
 
 ### Enhanced REPL Commands
 - `help` - Show available commands and language examples
@@ -193,10 +204,12 @@ cargo fmt
 
 ### Recent Enhancements
 
-- **🎉 Variable Assignment**: Added mutable variable assignment (`x = value`) with proper operator precedence
-- **🔄 Type Casting**: New builtin functions `int()` and `string()` for seamless type conversion
+- **🔄 While Loops**: Added `while (condition) { body }` loops for iterative programming patterns
+- **🎉 Variable Assignment**: Added mutable variable assignment (`x = value`) with proper operator precedence  
+- **🔄 Enhanced Type Casting**: Improved `string()` builtin to support arrays, hash maps, booleans, null, and more types
+- **🔢 Type Conversion**: New `int()` builtin function for string-to-integer conversion
 - **⚡ Enhanced REPL**: Interactive shell with command history, special commands (`help`, `clear`, `history`), and improved user experience
-- **📁 Example Programs**: Comprehensive example files including Fibonacci, basic demos, and more
+- **📁 Example Programs**: Comprehensive example files including while loops, Fibonacci, basic demos, and more
 - **🚀 Performance Benchmarks**: Added benchmarking suite for performance monitoring
 - **Enhanced Error Reporting**: Comprehensive error messages with line/column position tracking and contextual information
 - **Extended Operator Support**: Added comparison operators (`<=`, `>=`) and logical operators (`&&`, `||`)

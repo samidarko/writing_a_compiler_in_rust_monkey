@@ -108,6 +108,8 @@ pub enum Expression {
     Hash(HashLiteral),
     /// Assignment expression (`x = value`)
     Assignment(AssignmentExpression),
+    /// While loop expression (`while (condition) { body }`)
+    While(WhileExpression),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -162,6 +164,12 @@ pub struct CallExpression {
 pub struct AssignmentExpression {
     pub(crate) name: String,             // Variable name being assigned to
     pub(crate) value: Box<Expression>,   // Value being assigned
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct WhileExpression {
+    pub(crate) condition: Box<Expression>,  // Loop condition
+    pub(crate) body: BlockStatement,        // Loop body
 }
 
 // #[derive(Clone, Debug, PartialEq)]

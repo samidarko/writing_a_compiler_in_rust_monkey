@@ -153,8 +153,14 @@ fn builtin_string(args: &[Object]) -> Object {
     }
     match &args[0] {
         Object::Int(value) => Object::String(value.to_string()),
+        Object::Array(_) | Object::Hash(_) => {
+            Object::String(format!("{}", args[0]))
+        },
+        Object::String(value) => Object::String(value.to_string()),
+        Object::Boolean(value) => Object::String(value.to_string()),
+        Object::Null => Object::String("null".to_string()),
         other => Object::Error(format!(
-            "argument to `string` must be an integer, got {}",
+            "argument to `string` must be an integer, array, hash, string, boolean, or null, got {}",
             other
         )),
     }
@@ -178,6 +184,8 @@ pub fn get_builtin(name: &str) -> Object {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::object::HashLiteral;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_builtin_int() {
@@ -222,11 +230,16 @@ mod tests {
             (vec![Object::Int(123)], Object::String("123".to_string())),
             (vec![Object::Int(0)], Object::String("0".to_string())),
             (vec![Object::Int(-456)], Object::String("-456".to_string())),
-            
-            // Error cases - wrong argument type
-            (vec![Object::String("hello".to_string())], Object::Error("argument to `string` must be an integer, got 'hello'".to_string())),
-            (vec![Object::Boolean(false)], Object::Error("argument to `string` must be an integer, got false".to_string())),
-            (vec![Object::Null], Object::Error("argument to `string` must be an integer, got null".to_string())),
+            (vec![Object::Array(ArrayLiteral{
+                elements: vec![Object::Int(1), Object::Int(2)]
+            })], Object::String("[1, 2]".to_string())),
+            (vec![Object::Hash(HashLiteral{
+                pairs: BTreeMap::new()
+            })], Object::String("{}".to_string())),
+            (vec![Object::String("-456".to_string())], Object::String("-456".to_string())),
+            (vec![Object::Boolean(true)], Object::String("true".to_string())),
+            (vec![Object::Boolean(false)], Object::String("false".to_string())),
+            (vec![Object::Null], Object::String("null".to_string())),
         ];
 
         for (args, expected) in tests {
