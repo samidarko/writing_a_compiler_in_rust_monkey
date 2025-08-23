@@ -5,7 +5,7 @@ use crate::{ast, object};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use super::{builtins, eval, eval_infix_expression, eval_prefix_expression, Result};
+use super::{builtins, eval, eval_infix_expression, eval_prefix_expression, EvaluatorError, Result};
 
 pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Object> {
     let object = match expression {
@@ -19,7 +19,7 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
                 return Ok(Object::Builtin(builtin));
             }
 
-            return Err(format!("identifier not found: {}", name));
+            return Err(EvaluatorError::identifier_not_found(name));
         }
         Expression::Boolean(value) => Object::Boolean(value),
         Expression::Null => Object::Null,
@@ -77,7 +77,7 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
         Expression::Assignment(assignment_expression) => {
             // Check if variable exists before allowing assignment
             if environment.borrow().get(&assignment_expression.name).is_none() {
-                return Err(format!("identifier not found: {}", assignment_expression.name));
+                return Err(EvaluatorError::identifier_not_found(&assignment_expression.name));
             }
             
             let value = eval(Node::Expression(*assignment_expression.value), Rc::clone(&environment))?;
@@ -139,7 +139,7 @@ pub fn apply_function(function: Object, arguments: &[Object]) -> Result<Object> 
             Ok(unwrap_return_value(evaluated))
         }
         Object::Builtin(f) => Ok((f.f)(arguments)),
-        _ => Err(format!("not a function: {}", function)),
+        _ => Err(EvaluatorError::invalid_function_call(format!("not a function: {}", function))),
     }
 }
 
@@ -300,10 +300,10 @@ pub fn eval_for_expression(for_expression: ast::ForExpression, environment: Env)
             }
         }
         _ => {
-            return Err(format!(
+            return Err(EvaluatorError::type_error(format!(
                 "for loop collection must be an array or hash map, got {}",
                 collection
-            ));
+            )));
         }
     }
     

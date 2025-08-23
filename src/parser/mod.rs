@@ -45,7 +45,7 @@ pub use precedence::{get_token_precedence, Precedence};
 
 
 /// Details about an unexpected token encountered during parsing.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnexpectedToken {
     want: String,
     got: String,
@@ -53,7 +53,7 @@ pub struct UnexpectedToken {
 }
 
 /// Errors that can occur during parsing.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParserError {
     /// Error from the underlying lexer
     LexerError(lexer::LexerError),

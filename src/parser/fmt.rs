@@ -1,5 +1,6 @@
 use crate::parser::{ParserError, UnexpectedToken};
 use std::fmt;
+use std::error::Error;
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -37,6 +38,21 @@ impl fmt::Display for ParserError {
                 write!(f, "  Unexpected prefix operator '{}'", token)
             }
         }
+    }
+}
+
+impl Error for ParserError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ParserError::LexerError(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<crate::lexer::LexerError> for ParserError {
+    fn from(err: crate::lexer::LexerError) -> Self {
+        ParserError::LexerError(err)
     }
 }
 

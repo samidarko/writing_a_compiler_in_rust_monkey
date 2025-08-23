@@ -37,20 +37,18 @@
 mod builtins;
 mod expressions;
 mod operators;
+mod errors;
 mod statements;
 
 use crate::ast::Node;
 use crate::object::environment::Env;
 use std::rc::Rc;
-use std::result;
 
-// Re-export public functions
+// Re-export public functions and types
+pub use errors::{EvaluatorError, Result};
 pub use expressions::eval_expression;
 pub use operators::{eval_infix_expression, eval_prefix_expression};
 pub use statements::{eval_program, eval_statement};
-
-/// Result type for evaluation operations.
-pub type Result<T> = result::Result<T, String>;
 
 /// Evaluates an AST node and returns the resulting object.
 ///
@@ -95,7 +93,7 @@ pub use crate::object::Object;
 #[cfg(test)]
 mod tests {
     use crate::ast;
-    use crate::evaluator::{eval, Result};
+    use crate::evaluator::{eval, EvaluatorError, Result};
     use crate::lexer::Lexer;
     use crate::object;
     use crate::object::environment::Environment;
@@ -106,8 +104,8 @@ mod tests {
 
     fn test_eval(input: &str) -> Result<Object> {
         let lexer = Lexer::new(input.chars().collect());
-        let mut parser = Parser::new(lexer).map_err(|e| e.to_string())?;
-        let program = parser.parse().map_err(|e| e.to_string())?;
+        let mut parser = Parser::new(lexer)?;
+        let program = parser.parse()?;
         let environment = Environment::new();
         let object = eval(ast::Node::Program(program), environment)?;
         Ok(object)
@@ -256,37 +254,37 @@ f(10);",
     #[test]
     fn error_handling() -> Result<()> {
         let tests = vec![
-            ("5 + true;", Err("type mismatch: 5 + true".to_string())),
-            ("5 + true; 5;", Err("type mismatch: 5 + true".to_string())),
-            ("-true;", Err("unknown operator: -true".to_string())),
+            ("5 + true;", Err(EvaluatorError::type_error("type mismatch: 5 + true"))),
+            ("5 + true; 5;", Err(EvaluatorError::type_error("type mismatch: 5 + true"))),
+            ("-true;", Err(EvaluatorError::type_error("unknown operator: -true"))),
             (
                 "true + false;",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
             (
                 "5; true + false; 5",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
             (
                 "true + false + true + false;",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
             (
                 "5; true + false; 5",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
             (
                 "if (10 > 1) { true + false; }",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
             (
                 "if (10 > 1) { if (10 > 1) { return true + false; } return 1; }",
-                Err("unknown operator: true + false".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
-            ("foobar;", Err("identifier not found: foobar".to_string())),
+            ("foobar;", Err(EvaluatorError::identifier_not_found("foobar"))),
             (
                 r#""Hello" - "World""#,
-                Err("unknown operator: 'Hello' - 'World'".to_string()),
+                Err(EvaluatorError::type_error("unknown operator: 'Hello' - 'World'")),
             ),
             (
                 r#"{"name": "Monkey"}[fn(x) { x }];"#,
@@ -297,8 +295,8 @@ f(10);",
         ];
 
         for test in tests {
-            let object = test_eval(test.0);
-            assert_eq!(object, test.1);
+            let result = test_eval(test.0);
+            assert_eq!(result, test.1);
         }
 
         Ok(())
@@ -709,15 +707,15 @@ sum([1, 2, 3, 4, 5]);
     fn variable_assignment_errors() -> Result<()> {
         let error_tests = vec![
             // Assigning to undeclared variable
-            ("x = 5;", "identifier not found: x"),
-            ("let y = 10; x = y;", "identifier not found: x"),
+            ("x = 5;", "Identifier 'x' not found"),
+            ("let y = 10; x = y;", "Identifier 'x' not found"),
         ];
 
         for (input, expected_error) in error_tests {
             let result = test_eval(input);
             match result {
                 Err(error) => assert!(
-                    error.contains(expected_error),
+                    error.to_string().contains(expected_error),
                     "Expected error '{}' but got '{}' for input '{}'",
                     expected_error,
                     error,

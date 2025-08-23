@@ -30,7 +30,7 @@ The Monkey interpreter supports:
 - **Array indexing** and hash map access
 - **Comments**: single-line (`//`) and multi-line (`/* */`)
 - **String escape sequences**: `\n`, `\t`, `\"`, `\\`, `\r`
-- **Enhanced error reporting** with line/column position tracking
+- **Enhanced error handling** with structured error types implementing `std::error::Error` trait
 - **Enhanced REPL** with command history, special commands, and improved user experience
 
 ## Architecture
@@ -186,6 +186,33 @@ exit(); // or exit(42) for custom exit code
 - `history` - Display command history
 - `Ctrl+C` or `Ctrl+D` - Exit the REPL
 
+## Error Handling
+
+The interpreter features a robust error handling system designed for better developer experience and ecosystem integration:
+
+### Structured Error Types
+
+All error types implement `std::error::Error` and provide detailed error information:
+
+- **`EvaluatorError`**: Runtime evaluation errors with categorized types:
+  - `TypeError`: Type mismatches and invalid operations
+  - `RuntimeError`: General execution errors  
+  - `IdentifierNotFound`: Undefined variable access
+  - `DivisionByZero`: Mathematical errors
+  - `InvalidFunctionCall`: Function call errors
+  - `InvalidIndex`: Array/hash indexing errors
+
+- **`ParserError`**: Parsing errors with position information
+- **`LexerError`**: Tokenization errors with character position
+
+### Automatic Error Conversion
+
+The system supports automatic error propagation using the `?` operator through `From` trait implementations, eliminating manual error conversion throughout the codebase.
+
+### Ecosystem Integration 
+
+All errors work seamlessly with popular Rust error handling crates like `anyhow`, `eyre`, and `thiserror` for larger applications.
+
 ## Development
 
 ### Running Specific Tests
@@ -217,6 +244,7 @@ cargo fmt
 
 ### Recent Enhancements
 
+- **🛠️ Enhanced Error Handling**: Structured error types with `std::error::Error` implementation for better ecosystem integration and automatic error conversions
 - **🔁 For Loops**: Added iterator-style `for (variable in collection) { body }` loops for arrays and hash maps with proper variable scoping
 - **🔄 While Loops**: Added `while (condition) { body }` loops for iterative programming patterns
 - **🎉 Variable Assignment**: Added mutable variable assignment (`x = value`) with proper operator precedence  

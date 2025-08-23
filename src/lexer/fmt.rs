@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter, Result};
+use std::error::Error;
 
 use super::LexerError;
 
@@ -21,6 +22,15 @@ impl Display for LexerError {
                 )?;
                 write!(f, "  Unexpected character in source code")
             }
+        }
+    }
+}
+
+impl Error for LexerError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            LexerError::IllegalInteger(err, _) => Some(err),
+            LexerError::IllegalCharacter(_, _) => None,
         }
     }
 }

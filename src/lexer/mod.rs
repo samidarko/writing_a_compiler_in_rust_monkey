@@ -55,7 +55,7 @@ impl Position {
 }
 
 /// Errors that can occur during lexical analysis.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexerError {
     /// Failed to parse an integer literal
     IllegalInteger(num::ParseIntError, Position),

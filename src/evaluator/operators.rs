@@ -1,7 +1,7 @@
 use crate::object::Object;
 use crate::token::Token;
 
-use super::Result;
+use super::{EvaluatorError, Result};
 
 pub fn eval_bang_operator_expression(right: Object) -> Object {
     match right {
@@ -15,7 +15,7 @@ pub fn eval_bang_operator_expression(right: Object) -> Object {
 pub fn eval_minus_operator_expression(right: Object) -> Result<Object> {
     match right {
         Object::Int(value) => Ok(Object::Int(-value)),
-        _ => Err(format!("unknown operator: -{}", right)),
+        _ => Err(EvaluatorError::type_error(format!("unknown operator: -{}", right))),
     }
 }
 
@@ -23,7 +23,7 @@ pub fn eval_prefix_expression(operator: Token, right: Object) -> Result<Object> 
     match operator {
         Token::Bang => Ok(eval_bang_operator_expression(right)),
         Token::Minus => eval_minus_operator_expression(right),
-        _ => Err(format!("unknown operator: {}{}", operator, right)),
+        _ => Err(EvaluatorError::type_error(format!("unknown operator: {}{}", operator, right))),
     }
 }
 
@@ -38,9 +38,9 @@ pub fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Re
             eval_string_infix_expression(operator, left, right)?
         }
         (_, left, right) if !left.is_same_variant(right) => {
-            return Err(format!("type mismatch: {} {} {}", left, operator, right))
+            return Err(EvaluatorError::type_error(format!("type mismatch: {} {} {}", left, operator, right)))
         }
-        _ => return Err(format!("unknown operator: {} {} {}", left, operator, right)),
+        _ => return Err(EvaluatorError::type_error(format!("unknown operator: {} {} {}", left, operator, right))),
     };
     Ok(object)
 }
@@ -62,10 +62,10 @@ pub fn eval_integer_infix_expression(
         (Token::Eq, Object::Int(left), Object::Int(right)) => Object::Boolean(left == right),
         (Token::NotEq, Object::Int(left), Object::Int(right)) => Object::Boolean(left != right),
         _ => {
-            return Err(format!(
+            return Err(EvaluatorError::type_error(format!(
                 "unknown operator: {} {} {}",
                 &left, &operator, &right
-            ))
+            )))
         }
     };
     Ok(object)
@@ -77,20 +77,20 @@ pub fn eval_string_infix_expression(
     right: Object,
 ) -> Result<Object> {
     if operator != Token::Plus {
-        return Err(format!(
+        return Err(EvaluatorError::type_error(format!(
             "unknown operator: {} {} {}",
             &left, &operator, &right
-        ));
+        )));
     }
 
     // Extract the actual string values, not their Display representation
     let left_value = match left {
         Object::String(s) => s,
-        _ => return Err("left operand is not a string".to_string()),
+        _ => return Err(EvaluatorError::type_error("left operand is not a string")),
     };
     let right_value = match right {
         Object::String(s) => s,
-        _ => return Err("right operand is not a string".to_string()),
+        _ => return Err(EvaluatorError::type_error("right operand is not a string")),
     };
     
     let object = Object::String(left_value + &right_value);

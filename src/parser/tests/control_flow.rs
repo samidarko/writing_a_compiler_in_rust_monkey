@@ -1,7 +1,6 @@
 use crate::ast;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, Result};
-use std::collections::BTreeMap;
 
 #[test]
 fn if_else_expression() -> Result<()> {
