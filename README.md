@@ -20,17 +20,18 @@ This project reminded me how rewarding it is to rediscover fundamentals—even a
 
 The Monkey interpreter supports:
 
-- **Variables** with `let` statements
+- **Variables** with `let` statements and **mutable assignment** (`variable = new_value`)
 - **Data types**: integers, booleans, strings, arrays, and hash maps
+- **Type casting**: `int()` and `string()` builtin functions for type conversion
 - **Operators**: arithmetic (`+`, `-`, `*`, `/`), comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`), logical (`&&`, `||`), and unary (`!`, `-`)
 - **Functions** with closures and first-class support
 - **Conditionals** (`if`/`else` expressions)
-- **Built-in functions**: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`
+- **Built-in functions**: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`, `int`, `string`
 - **Array indexing** and hash map access
 - **Comments**: single-line (`//`) and multi-line (`/* */`)
 - **String escape sequences**: `\n`, `\t`, `\"`, `\\`, `\r`
 - **Enhanced error reporting** with line/column position tracking
-- **Interactive REPL** for live programming
+- **Enhanced REPL** with command history, special commands, and improved user experience
 
 ## Architecture
 
@@ -63,20 +64,34 @@ cargo build --release
 # Build the project
 cargo build
 
-# Run the interactive REPL
+# Run the enhanced interactive REPL
 cargo run
-# Or after building: ./target/release/monkey
+
+# Run a Monkey program file
+cargo run -- examples/fibonacci.monkey
 
 # Run tests
 cargo test
 
 # Run tests with output
 cargo test -- --nocapture
+
+# Run benchmarks
+cargo bench
 ```
 
 ### Example Monkey Code
 
 ```monkey
+// Variables with mutable assignment
+let x = 5;
+x = x + 10;  // x is now 15
+
+// Type casting with new builtin functions
+let num_str = "42";
+let num = int(num_str);    // Convert string to integer
+let result = string(num);  // Convert back to string
+
 // Variables and functions
 let fibonacci = fn(x) {
   if (x == 0) {
@@ -128,6 +143,7 @@ exit(); // or exit(42) for custom exit code
 
 ## Built-in Functions
 
+### Core Functions
 - `len(array|string)` - Returns length of arrays or strings
 - `first(array)` - Returns first element of an array
 - `last(array)` - Returns last element of an array
@@ -135,6 +151,16 @@ exit(); // or exit(42) for custom exit code
 - `push(array, element)` - Returns new array with element appended
 - `puts(args...)` - Prints arguments to stdout
 - `exit([code])` - Exits the REPL with optional exit code
+
+### Type Conversion Functions  
+- `int(string)` - Converts a string to an integer
+- `string(integer)` - Converts an integer to a string
+
+### Enhanced REPL Commands
+- `help` - Show available commands and language examples
+- `clear` - Clear the terminal screen
+- `history` - Display command history
+- `Ctrl+C` or `Ctrl+D` - Exit the REPL
 
 ## Development
 
@@ -167,12 +193,17 @@ cargo fmt
 
 ### Recent Enhancements
 
+- **🎉 Variable Assignment**: Added mutable variable assignment (`x = value`) with proper operator precedence
+- **🔄 Type Casting**: New builtin functions `int()` and `string()` for seamless type conversion
+- **⚡ Enhanced REPL**: Interactive shell with command history, special commands (`help`, `clear`, `history`), and improved user experience
+- **📁 Example Programs**: Comprehensive example files including Fibonacci, basic demos, and more
+- **🚀 Performance Benchmarks**: Added benchmarking suite for performance monitoring
 - **Enhanced Error Reporting**: Comprehensive error messages with line/column position tracking and contextual information
 - **Extended Operator Support**: Added comparison operators (`<=`, `>=`) and logical operators (`&&`, `||`)
 - **Comment Support**: Full single-line (`//`) and multi-line (`/* */`) comment parsing
 - **String Escape Sequences**: Support for common escape sequences (`\n`, `\t`, `\"`, `\\`, `\r`)
 - **Modular Architecture**: Split large files into logical modules for better maintainability
-- **Comprehensive Testing**: 58+ tests covering all features including edge cases and error conditions
+- **Comprehensive Testing**: 64+ tests covering all features including edge cases and error conditions
 
 ### Rust-Specific Design Choices
 

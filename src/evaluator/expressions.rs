@@ -74,6 +74,16 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
         Expression::Hash(hash_literal) => {
             return eval_hash_literal(Expression::Hash(hash_literal), environment)
         }
+        Expression::Assignment(assignment_expression) => {
+            // Check if variable exists before allowing assignment
+            if environment.borrow().get(&assignment_expression.name).is_none() {
+                return Err(format!("identifier not found: {}", assignment_expression.name));
+            }
+            
+            let value = eval(Node::Expression(*assignment_expression.value), Rc::clone(&environment))?;
+            environment.borrow_mut().set(&assignment_expression.name, &value);
+            return Ok(value.clone()); // Assignment returns the assigned value
+        }
     };
     Ok(object)
 }

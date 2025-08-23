@@ -106,6 +106,8 @@ pub enum Expression {
     Index(IndexExpression),
     /// Hash map literal (`{"key": "value"}`)
     Hash(HashLiteral),
+    /// Assignment expression (`x = value`)
+    Assignment(AssignmentExpression),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -154,6 +156,12 @@ pub struct HashLiteral {
 pub struct CallExpression {
     pub(crate) function: Box<Expression>, // Identifier or FunctionLiteral
     pub(crate) arguments: Vec<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct AssignmentExpression {
+    pub(crate) name: String,             // Variable name being assigned to
+    pub(crate) value: Box<Expression>,   // Value being assigned
 }
 
 // #[derive(Clone, Debug, PartialEq)]

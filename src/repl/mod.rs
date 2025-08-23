@@ -11,6 +11,7 @@
 //! - Persistent environment between evaluations  
 //! - Comprehensive error reporting
 //! - Support for exit commands with custom exit codes
+//! - Enhanced REPL with history, tab completion, and better UX
 //!
 //! # Examples
 //!
@@ -21,6 +22,11 @@
 //! let exit_code = repl().expect("REPL failed");
 //! println!("REPL exited with code: {}", exit_code);
 //! ```
+
+pub mod enhanced;
+
+// Re-export the enhanced REPL as the default
+pub use enhanced::enhanced_repl;
 
 use crate::lexer::Lexer;
 

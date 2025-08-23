@@ -286,7 +286,7 @@ f(10);",
             ("foobar;", Err("identifier not found: foobar".to_string())),
             (
                 r#""Hello" - "World""#,
-                Err("unknown operator: Hello - World".to_string()),
+                Err("unknown operator: 'Hello' - 'World'".to_string()),
             ),
             (
                 r#"{"name": "Monkey"}[fn(x) { x }];"#,
@@ -649,6 +649,85 @@ sum([1, 2, 3, 4, 5]);
         for (input, expected) in tests {
             let evaluated = test_eval(input)?;
             assert_eq!(evaluated, expected);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn variable_assignment() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            // Basic assignment
+            ("let x = 5; x = 10; x;", Object::Int(10)),
+            ("let x = 5; x = x + 1; x;", Object::Int(6)),
+            
+            // Multiple assignments
+            ("let x = 5; let y = 10; x = y; x;", Object::Int(10)),
+            
+            // Assignment with expressions
+            ("let x = 5; x = 10 * 2; x;", Object::Int(20)),
+            ("let x = 5; let y = 3; x = x * y + 1; x;", Object::Int(16)),
+            
+            // Assignment with function calls
+            ("let add = fn(a, b) { a + b; }; let x = 5; x = add(x, 10); x;", Object::Int(15)),
+            
+            // String assignment
+            ("let x = \"hello\"; x = \"world\"; x;", Object::String("world".to_string())),
+            ("let x = \"hello\"; x = x + \" world\"; x;", Object::String("hello world".to_string())),
+            
+            // Boolean assignment
+            ("let x = true; x = false; x;", Object::Boolean(false)),
+            ("let x = true; x = !x; x;", Object::Boolean(false)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected, "Input: {}", input);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn variable_assignment_returns_value() -> Result<()> {
+        // Test that assignment returns the assigned value
+        let tests: Vec<(&str, Object)> = vec![
+            ("let x = 5; x = 10", Object::Int(10)), // Assignment returns value
+            ("let x = true; x = false", Object::Boolean(false)),
+            ("let x = \"old\"; x = \"new\"", Object::String("new".to_string())),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected, "Input: {}", input);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn variable_assignment_errors() -> Result<()> {
+        let error_tests = vec![
+            // Assigning to undeclared variable
+            ("x = 5;", "identifier not found: x"),
+            ("let y = 10; x = y;", "identifier not found: x"),
+        ];
+
+        for (input, expected_error) in error_tests {
+            let result = test_eval(input);
+            match result {
+                Err(error) => assert!(
+                    error.contains(expected_error),
+                    "Expected error '{}' but got '{}' for input '{}'",
+                    expected_error,
+                    error,
+                    input
+                ),
+                Ok(obj) => panic!(
+                    "Expected error '{}' but got successful result '{}' for input '{}'",
+                    expected_error, obj, input
+                ),
+            }
         }
 
         Ok(())

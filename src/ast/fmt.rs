@@ -73,6 +73,7 @@ impl Display for Expression {
             Expression::Array(array_literal) => array_literal.fmt(f),
             Expression::Index(index_expression) => index_expression.fmt(f),
             Expression::Hash(hash_literal) => hash_literal.fmt(f),
+            Expression::Assignment(assignment_expression) => assignment_expression.fmt(f),
             Expression::Null => write!(f, "null"),
         }
     }
@@ -148,5 +149,11 @@ impl Display for HashLiteral {
             .collect::<Vec<String>>();
         write!(f, "{}", pairs.join(", "))?;
         write!(f, "}}")
+    }
+}
+
+impl Display for AssignmentExpression {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "{} = {}", self.name, self.value)
     }
 }

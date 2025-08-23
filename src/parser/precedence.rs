@@ -13,6 +13,8 @@ use crate::token::Token;
 pub enum Precedence {
     /// Lowest precedence
     Lowest,
+    /// Assignment operators (`=`) - right-associative
+    Assignment,
     /// Equality operators (`==`, `!=`)  
     Equals,
     /// Comparison operators (`<`, `>`, `<=`, `>=`)
@@ -54,6 +56,7 @@ pub enum Precedence {
 /// ```
 pub fn get_token_precedence(token: &Token) -> Precedence {
     match token {
+        Token::Assign => Precedence::Assignment,
         Token::Eq | Token::NotEq => Precedence::Equals,
         Token::Lt | Token::Gt | Token::Lte | Token::Gte => Precedence::LessGreater,
         Token::Plus | Token::Minus => Precedence::Sum,

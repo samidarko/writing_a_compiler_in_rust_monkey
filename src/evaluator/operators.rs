@@ -83,8 +83,16 @@ pub fn eval_string_infix_expression(
         ));
     }
 
-    let left_value = left.to_string();
-    let right_value = right.to_string();
+    // Extract the actual string values, not their Display representation
+    let left_value = match left {
+        Object::String(s) => s,
+        _ => return Err("left operand is not a string".to_string()),
+    };
+    let right_value = match right {
+        Object::String(s) => s,
+        _ => return Err("right operand is not a string".to_string()),
+    };
+    
     let object = Object::String(left_value + &right_value);
     Ok(object)
 }

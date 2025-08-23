@@ -284,6 +284,7 @@ impl Parser {
             Plus | Minus | Slash | Asterisk | Eq | NotEq | Lt | Gt | Lte | Gte => {
                 self.parse_infix_expression(left)
             }
+            Assign => self.parse_assignment_expression(left),
             LParen => self.parse_call_expression(left),
             LBracket => self.parse_index_expression(left),
             _ => Err(ParserError::UnexpectedInfix(
@@ -540,6 +541,21 @@ impl Parser {
         self.expect_peek(Token::RBracket)?;
 
         Ok(expression)
+    }
+    
+    fn parse_assignment_expression(&mut self, left: Expression) -> Result<Expression> {
+        // The left side must be an identifier
+        if let Expression::Identifier(name) = left {
+            self.next_token()?; // consume '='
+            // For right associativity, use Assignment precedence - 1, but since Assignment is already low, use Lowest
+            let value = Box::new(self.parse_expression(Precedence::Assignment)?);
+            Ok(Expression::Assignment(ast::AssignmentExpression { name, value }))
+        } else {
+            Err(ParserError::UnexpectedInfix(
+                Token::Assign,
+                self.current_position.clone(),
+            ))
+        }
     }
 
     /// Parses the entire input and returns a Program AST.
