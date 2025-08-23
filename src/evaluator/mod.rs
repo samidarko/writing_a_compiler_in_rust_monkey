@@ -807,4 +807,128 @@ sum([1, 2, 3, 4, 5]);
         
         Ok(())
     }
+
+    #[test]
+    fn for_loop_array_iteration() -> Result<()> {
+        let tests: Vec<(&str, Object)> = vec![
+            // Simple for loop over array elements
+            ("for (x in [1, 2, 3]) { x }", Object::Int(3)), // Returns last iteration value
+            ("let arr = [1, 2, 3]; for (x in arr) { x }", Object::Int(3)), // Returns last iteration value
+
+            // For loop with accumulator
+            (r#"
+                let sum = 0;
+                for (x in [1, 2, 3, 4, 5]) {
+                    sum = sum + x;
+                }
+                sum;
+            "#, Object::Int(15)),
+
+            // For loop with complex expressions
+            (r#"
+                let result = [];
+                for (x in [1, 2, 3]) {
+                    result = push(result, x * 2);
+                }
+                result;
+            "#, Object::Array(ArrayLiteral {
+                elements: vec![Object::Int(2), Object::Int(4), Object::Int(6)],
+            })),
+
+            // Empty array
+            ("for (x in []) { x }", Object::Null),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, expected);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_hash_iteration() -> Result<()> {
+        let tests: Vec<(&str, usize)> = vec![
+            // Simple for loop over hash keys - count iterations
+            (r#"
+                let count = 0;
+                for (key in {"a": 1, "b": 2, "c": 3}) {
+                    count = count + 1;
+                }
+                count;
+            "#, 3),
+            
+            // Empty hash
+            (r#"
+                let count = 0;
+                for (key in {}) {
+                    count = count + 1;
+                }
+                count;
+            "#, 0),
+        ];
+
+        for (input, expected_count) in tests {
+            let evaluated = test_eval(input)?;
+            assert_eq!(evaluated, Object::Int(expected_count as isize));
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_variable_scoping() -> Result<()> {
+        // Test that loop variable doesn't leak to outer scope
+        let input = r#"
+            let x = 10;
+            for (x in [1, 2, 3]) {
+                x + 1;
+            }
+            x; // Should still be 10
+        "#;
+        
+        let evaluated = test_eval(input)?;
+        assert_eq!(evaluated, Object::Int(10));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_with_return() -> Result<()> {
+        // Test early return from for loop inside function
+        let input = r#"
+            let find_first = fn(arr, target) {
+                for (x in arr) {
+                    if (x == target) {
+                        return x;
+                    }
+                }
+                return -1;
+            };
+            find_first([1, 2, 3, 4, 5], 3);
+        "#;
+        
+        let evaluated = test_eval(input)?;
+        assert_eq!(evaluated, Object::Int(3));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_error_cases() -> Result<()> {
+        let error_cases = vec![
+            // Invalid collection type
+            "for (x in 42) { x }",
+            "for (x in true) { x }",
+            "for (x in \"hello\") { x }",
+        ];
+
+        for input in error_cases {
+            let result = test_eval(input);
+            assert!(result.is_err(), "Expected error for input: {}", input);
+        }
+        
+        Ok(())
+    }
 }

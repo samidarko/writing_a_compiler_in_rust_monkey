@@ -87,6 +87,9 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
         Expression::While(while_expression) => {
             return eval_while_expression(while_expression, environment);
         }
+        Expression::For(for_expression) => {
+            return eval_for_expression(for_expression, environment);
+        }
     };
     Ok(object)
 }
@@ -223,6 +226,84 @@ pub fn eval_while_expression(while_expression: ast::WhileExpression, environment
         // Handle return values - if we encounter a return, break out of the loop
         if matches!(result, Object::Return(_)) {
             break;
+        }
+    }
+    
+    Ok(result)
+}
+
+pub fn eval_for_expression(for_expression: ast::ForExpression, environment: Env) -> Result<Object> {
+    let mut result = Object::Null;
+    
+    // Evaluate the collection expression
+    let collection = eval(
+        Node::Expression(*for_expression.collection.clone()),
+        Rc::clone(&environment),
+    )?;
+    
+    match collection {
+        Object::Array(array) => {
+            // Save the original value of the loop variable (if it exists)
+            let original_value = environment.borrow().get(&for_expression.variable);
+            
+            for element in array.elements {
+                // Set the loop variable to the current array element in the current environment
+                environment.borrow_mut().set(&for_expression.variable, &element);
+                
+                result = eval(
+                    Node::Statement(Statement::Block(for_expression.body.clone())),
+                    Rc::clone(&environment),
+                )?;
+                
+                // Handle return values - if we encounter a return, break out of the loop
+                if matches!(result, Object::Return(_)) {
+                    break;
+                }
+            }
+            
+            // Restore the original value of the loop variable (or remove it if it didn't exist)
+            match original_value {
+                Some(value) => environment.borrow_mut().set(&for_expression.variable, &value),
+                None => {
+                    // Remove the loop variable from the environment
+                    environment.borrow_mut().store.remove(&for_expression.variable);
+                }
+            }
+        }
+        Object::Hash(hash_map) => {
+            // Save the original value of the loop variable (if it exists)
+            let original_value = environment.borrow().get(&for_expression.variable);
+            
+            // For hash maps, iterate over keys only
+            for key in hash_map.pairs.keys() {
+                // Set the loop variable to the current hash key in the current environment
+                environment.borrow_mut().set(&for_expression.variable, key);
+                
+                result = eval(
+                    Node::Statement(Statement::Block(for_expression.body.clone())),
+                    Rc::clone(&environment),
+                )?;
+                
+                // Handle return values - if we encounter a return, break out of the loop
+                if matches!(result, Object::Return(_)) {
+                    break;
+                }
+            }
+            
+            // Restore the original value of the loop variable (or remove it if it didn't exist)
+            match original_value {
+                Some(value) => environment.borrow_mut().set(&for_expression.variable, &value),
+                None => {
+                    // Remove the loop variable from the environment
+                    environment.borrow_mut().store.remove(&for_expression.variable);
+                }
+            }
+        }
+        _ => {
+            return Err(format!(
+                "for loop collection must be an array or hash map, got {}",
+                collection
+            ));
         }
     }
     

@@ -266,6 +266,7 @@ impl Parser {
             Token::LParen => return self.parse_grouped_expression(),
             Token::If => return self.parse_if_expression(),
             Token::While => return self.parse_while_expression(),
+            Token::For => return self.parse_for_expression(),
             Token::Fn => return self.parse_function_literal(),
             Token::LBracket => return self.parse_array_literal(),
             Token::LBrace => return self.parse_hash_literal(),
@@ -419,6 +420,51 @@ impl Parser {
 
         Ok(ast::Expression::While(ast::WhileExpression {
             condition,
+            body,
+        }))
+    }
+
+    fn parse_for_expression(&mut self) -> Result<ast::Expression> {
+        // Follow the exact same pattern as while_expression
+        self.expect_peek(Token::LParen)?;
+        self.next_token()?; // Advance to identifier
+        
+        // Parse variable name
+        let variable = if let Token::Ident(name) = &self.current {
+            name.clone()
+        } else {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                want: "identifier".to_string(),
+                got: format!("{}", &self.current),
+                position: self.current_position.clone(),
+            }));
+        };
+
+        self.next_token()?; // pass Ident
+        self.expect_current(Token::In)?;
+
+        // Parse collection expression
+        let collection = Box::new(self.parse_expression(Precedence::Lowest)?);
+        
+        // Follow exact same pattern as while parsing  
+        self.expect_peek(Token::RParen)?;
+        self.expect_current(Token::RParen)?;
+        self.expect_current(Token::LBrace)?;
+
+        // Parse the body of the for block
+        let body = if let ast::Statement::Block(block) = self.parse_block_statement()? {
+            block
+        } else {
+            return Err(ParserError::UnexpectedToken(UnexpectedToken {
+                want: "for block statement".to_string(),
+                got: format!("{}", &self.current),
+                position: self.current_position.clone(),
+            }));
+        };
+
+        Ok(ast::Expression::For(ast::ForExpression {
+            variable,
+            collection,
             body,
         }))
     }

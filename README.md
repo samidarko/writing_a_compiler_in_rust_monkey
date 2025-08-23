@@ -22,7 +22,7 @@ The Monkey interpreter supports:
 
 - **Variables** with `let` statements and **mutable assignment** (`variable = new_value`)
 - **Data types**: integers, booleans, strings, arrays, and hash maps
-- **Control flow**: `if`/`else` conditionals and **`while` loops** for iteration
+- **Control flow**: `if`/`else` conditionals, **`while` loops**, and **`for` loops** for iteration
 - **Type casting**: `int()` and enhanced `string()` builtin functions for type conversion
 - **Operators**: arithmetic (`+`, `-`, `*`, `/`), comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`), logical (`&&`, `||`), and unary (`!`, `-`)
 - **Functions** with closures and first-class support
@@ -70,6 +70,7 @@ cargo run
 # Run a Monkey program file
 cargo run -- examples/fibonacci.monkey
 cargo run -- examples/while_loops.monkey
+cargo run -- examples/for_loops.monkey
 
 # Run tests
 cargo test
@@ -116,6 +117,18 @@ let sum = 0;
 while (i < 10) {
     sum = sum + i;
     i = i + 1;
+}
+
+// For loops for array and hash iteration
+let numbers = [1, 2, 3, 4, 5];
+let total = 0;
+for (num in numbers) {
+    total = total + num;  // total becomes 15
+}
+
+let person = {"name": "John", "age": 30};
+for (key in person) {
+    puts("Property: " + string(key));
 }
 
 // Arrays and higher-order functions  
@@ -204,6 +217,7 @@ cargo fmt
 
 ### Recent Enhancements
 
+- **🔁 For Loops**: Added iterator-style `for (variable in collection) { body }` loops for arrays and hash maps with proper variable scoping
 - **🔄 While Loops**: Added `while (condition) { body }` loops for iterative programming patterns
 - **🎉 Variable Assignment**: Added mutable variable assignment (`x = value`) with proper operator precedence  
 - **🔄 Enhanced Type Casting**: Improved `string()` builtin to support arrays, hash maps, booleans, null, and more types

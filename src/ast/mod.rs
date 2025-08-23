@@ -110,6 +110,8 @@ pub enum Expression {
     Assignment(AssignmentExpression),
     /// While loop expression (`while (condition) { body }`)
     While(WhileExpression),
+    /// For loop expression (`for (variable in collection) { body }`)
+    For(ForExpression),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -169,6 +171,13 @@ pub struct AssignmentExpression {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WhileExpression {
     pub(crate) condition: Box<Expression>,  // Loop condition
+    pub(crate) body: BlockStatement,        // Loop body
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ForExpression {
+    pub(crate) variable: String,            // Loop variable name
+    pub(crate) collection: Box<Expression>, // Collection to iterate over
     pub(crate) body: BlockStatement,        // Loop body
 }
 

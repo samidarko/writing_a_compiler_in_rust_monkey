@@ -83,11 +83,22 @@ The interpreter follows a traditional compiler architecture:
 ## Monkey Language Features
 
 The interpreter supports:
-- Variables with `let` statements
-- Integers, booleans, strings, arrays
+- Variables with `let` statements and mutable assignment (`variable = new_value`)
+- Data types: integers, booleans, strings, arrays, hash maps
+- Control flow: `if`/`else` conditionals and `while` loops
 - Arithmetic and comparison operators
-- Functions with closures
-- Conditionals (`if`/`else`)
-- Built-in functions
-- Array indexing
-- REPL for interactive programming
+- Functions with closures and first-class support
+- Built-in functions: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`, `int`, `string`
+- Type casting with `int()` and `string()` builtin functions
+- Array indexing and hash map access
+- Enhanced REPL for interactive programming
+- Comments (single-line `//` and multi-line `/* */`)
+- String escape sequences
+
+## Development Workflow
+
+When working on this codebase:
+- Always update the README before git commit
+- Run tests after making changes: `cargo test`
+- Use meaningful commit messages following conventional commits format. Use only type and description, no need for a scope. Example: `feat: add new feature`.
+- Include comprehensive test coverage for new features

@@ -102,4 +102,8 @@ pub enum Token {
     Return,
     /// While keyword `while`
     While,
+    /// For keyword `for`
+    For,
+    /// In keyword `in`
+    In,
 }
