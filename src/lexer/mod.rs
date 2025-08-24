@@ -342,6 +342,26 @@ impl Lexer {
                     'r' => result.push('\r'),
                     '\\' => result.push('\\'),
                     '"' => result.push('"'),
+                    'x' => {
+                        // Hexadecimal escape sequence: \xHH
+                        if let Some(ch) = self.read_hex_escape() {
+                            result.push(ch);
+                        } else {
+                            // Invalid hex escape, treat literally
+                            result.push('\\');
+                            result.push('x');
+                        }
+                    }
+                    'u' => {
+                        // Unicode escape sequence: \uHHHH
+                        if let Some(ch) = self.read_unicode_escape() {
+                            result.push(ch);
+                        } else {
+                            // Invalid unicode escape, treat literally
+                            result.push('\\');
+                            result.push('u');
+                        }
+                    }
                     '\0' => {
                         // Unterminated escape sequence at EOF
                         result.push('\\');
@@ -359,6 +379,94 @@ impl Lexer {
         }
 
         result
+    }
+
+    fn read_hex_escape(&mut self) -> Option<char> {
+        // Look ahead to check if we have two valid hex digits
+        let saved_position = self.position;
+        let saved_read_position = self.read_position;
+        let saved_ch = self.ch;
+        let saved_line = self.line;
+        let saved_column = self.column;
+        
+        let mut hex_digits = String::new();
+        
+        for _ in 0..2 {
+            self.read_char();
+            if self.ch.is_ascii_hexdigit() {
+                hex_digits.push(self.ch);
+            } else {
+                // Invalid hex digit, restore state
+                self.position = saved_position;
+                self.read_position = saved_read_position;
+                self.ch = saved_ch;
+                self.line = saved_line;
+                self.column = saved_column;
+                return None;
+            }
+        }
+        
+        // Parse the hex value
+        if let Ok(value) = u8::from_str_radix(&hex_digits, 16) {
+            Some(value as char)
+        } else {
+            // Restore state on parse error
+            self.position = saved_position;
+            self.read_position = saved_read_position;
+            self.ch = saved_ch;
+            self.line = saved_line;
+            self.column = saved_column;
+            None
+        }
+    }
+
+    fn read_unicode_escape(&mut self) -> Option<char> {
+        // Look ahead to check if we have four valid hex digits
+        let saved_position = self.position;
+        let saved_read_position = self.read_position;
+        let saved_ch = self.ch;
+        let saved_line = self.line;
+        let saved_column = self.column;
+        
+        let mut hex_digits = String::new();
+        
+        for _ in 0..4 {
+            self.read_char();
+            if self.ch.is_ascii_hexdigit() {
+                hex_digits.push(self.ch);
+            } else {
+                // Invalid hex digit, restore state
+                self.position = saved_position;
+                self.read_position = saved_read_position;
+                self.ch = saved_ch;
+                self.line = saved_line;
+                self.column = saved_column;
+                return None;
+            }
+        }
+        
+        // Parse the hex value and convert to char
+        if let Ok(value) = u32::from_str_radix(&hex_digits, 16) {
+            if let Some(ch) = char::from_u32(value) {
+                Some(ch)
+            } else {
+                // Invalid unicode code point, restore state
+                self.position = saved_position;
+                self.read_position = saved_read_position;
+                self.ch = saved_ch;
+                self.line = saved_line;
+                self.column = saved_column;
+                None
+            }
+        } else {
+            // Restore state on parse error
+            self.position = saved_position;
+            self.read_position = saved_read_position;
+            self.ch = saved_ch;
+            self.line = saved_line;
+            self.column = saved_column;
+            None
+        }
     }
 
     fn skip_single_line_comment(&mut self) {
@@ -621,9 +729,145 @@ true || false;
 
     #[test]
     fn string_unknown_escape_sequences() -> Result<()> {
-        let input = r#""hello\xworld\z";"#;
+        let input = r#""hello\z\k";"#;
         let expectations: Vec<Token> = Vec::from([
-            Token::String("hello\\xworld\\z".into()),
+            Token::String("hello\\z\\k".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_hex_escape_sequences() -> Result<()> {
+        let input = r#""Hello \x41\x42\x43 World";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("Hello ABC World".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_unicode_escape_sequences() -> Result<()> {
+        let input = r#""Hello \u0041\u0042\u0043 \u2764\uFE0F";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("Hello ABC ❤️".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_mixed_escape_sequences() -> Result<()> {
+        let input = r#""Line1\nTab\tHex:\x48Uni:\u0065\x6C\u006Co\r\n";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("Line1\nTab\tHex:HUni:ello\r\n".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_invalid_hex_escape_sequences() -> Result<()> {
+        let input = r#""Invalid \xGG \xZ1 \x";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("Invalid \\xGG \\xZ1 \\x".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_invalid_unicode_escape_sequences() -> Result<()> {
+        let input = r#""Invalid \uGGGG \uZ123 \u12";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("Invalid \\uGGGG \\uZ123 \\u12".into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_hex_escape_edge_cases() -> Result<()> {
+        // Test boundary values for hex escapes
+        let input = r#""\x00\x20\x7F\xFF";"#;
+        let expected_string = format!("{}{}{}{}", '\0', ' ', '\x7F', '\u{FF}');
+        let expectations: Vec<Token> = Vec::from([
+            Token::String(expected_string.into()),
+            Token::Semicolon,
+            Token::EoF,
+        ]);
+        let mut lexer = Lexer::new(input.chars().collect());
+        let mut tok;
+
+        for expectation in expectations {
+            tok = lexer.next_token()?;
+            assert_eq!(tok, expectation);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_unicode_escape_edge_cases() -> Result<()> {
+        // Test various Unicode ranges
+        let input = r#""\u0000\u0020\u007F\u00A0\u2603\uFFFD";"#;
+        let expectations: Vec<Token> = Vec::from([
+            Token::String("\u{0000}\u{0020}\u{007F}\u{00A0}\u{2603}\u{FFFD}".into()),
             Token::Semicolon,
             Token::EoF,
         ]);

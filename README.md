@@ -29,7 +29,7 @@ The Monkey interpreter supports:
 - **Built-in functions**: `len`, `first`, `last`, `rest`, `push`, `puts`, `exit`, `int`, `string`
 - **Array indexing** and hash map access
 - **Comments**: single-line (`//`) and multi-line (`/* */`)
-- **String escape sequences**: `\n`, `\t`, `\"`, `\\`, `\r`
+- **String escape sequences**: `\n`, `\t`, `\"`, `\\`, `\r`, `\xHH` (hex), `\uHHHH` (Unicode)
 - **Enhanced error handling** with structured error types implementing `std::error::Error` trait
 - **Enhanced REPL** with command history, special commands, and improved user experience
 
@@ -158,8 +158,8 @@ if (adult) {
     puts("Person is an adult named: " + person["name"]);
 }
 
-// String with escape sequences
-puts("Hello\nWorld!\tTab\tSeparated\"Quote\"");
+// String with escape sequences including hex and Unicode
+puts("Hello\nWorld!\tTab\x21\u0020Unicode: \u2764\uFE0F\"Quote\"");
 
 // Exit the REPL
 exit(); // or exit(42) for custom exit code
@@ -256,7 +256,7 @@ cargo fmt
 - **Enhanced Error Reporting**: Comprehensive error messages with line/column position tracking and contextual information
 - **Extended Operator Support**: Added comparison operators (`<=`, `>=`) and logical operators (`&&`, `||`)
 - **Comment Support**: Full single-line (`//`) and multi-line (`/* */`) comment parsing
-- **String Escape Sequences**: Support for common escape sequences (`\n`, `\t`, `\"`, `\\`, `\r`)
+- **String Escape Sequences**: Support for escape sequences (`\n`, `\t`, `\"`, `\\`, `\r`, `\xHH` hex, `\uHHHH` Unicode)
 - **Modular Architecture**: Split large files into logical modules for better maintainability
 - **Comprehensive Testing**: 64+ tests covering all features including edge cases and error conditions
 
