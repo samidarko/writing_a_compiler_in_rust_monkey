@@ -1,11 +1,11 @@
-use crate::lexer::Lexer;
 use crate::ast::Node;
 use crate::evaluator::eval;
+use crate::lexer::Lexer;
 use crate::object::environment::Environment;
 use crate::parser::Parser;
 use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor};
 use rustyline::history::History;
+use rustyline::DefaultEditor;
 
 /// Enhanced REPL with history, tab completion, and better user experience.
 pub fn enhanced_repl() -> Result<i32, String> {
@@ -23,7 +23,7 @@ pub fn enhanced_repl() -> Result<i32, String> {
         match readline {
             Ok(line) => {
                 let trimmed = line.trim();
-                
+
                 // Skip empty lines
                 if trimmed.is_empty() {
                     continue;
@@ -85,13 +85,16 @@ pub fn enhanced_repl() -> Result<i32, String> {
     Ok(0)
 }
 
-fn evaluate_line(input: &str, environment: crate::object::environment::Env) -> Result<Option<i32>, String> {
+fn evaluate_line(
+    input: &str,
+    environment: crate::object::environment::Env,
+) -> Result<Option<i32>, String> {
     let lexer = Lexer::new(input.chars().collect());
     let mut parser = Parser::new(lexer).map_err(|e| format!("Parser error: {}", e))?;
     let program = parser.parse().map_err(|e| format!("Parse error: {}", e))?;
-    
-    let evaluated = eval(Node::Program(program), environment)
-        .map_err(|e| format!("Runtime error: {}", e))?;
+
+    let evaluated =
+        eval(Node::Program(program), environment).map_err(|e| format!("Runtime error: {}", e))?;
 
     // Check if the evaluated result is an exit command
     if let crate::object::Object::Exit(code) = &evaluated {

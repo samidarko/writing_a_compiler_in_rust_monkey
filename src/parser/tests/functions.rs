@@ -2,6 +2,7 @@ use crate::ast;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, Result};
 use crate::token::Token;
+use smallvec::smallvec;
 
 #[test]
 fn parse_function_literal() -> Result<()> {
@@ -13,16 +14,16 @@ fn parse_function_literal() -> Result<()> {
         "fn(x, y) { x + y; };",
         "fn(x, y) { (x + y) }",
         ast::Expression::Function(ast::FunctionLiteral {
-            parameters: vec!["x".to_string(), "y".to_string()],
-            body: ast::BlockStatement {
-                statements: vec![ast::Statement::Expression(ast::Expression::Infix(
-                    ast::InfixExpression {
-                        left: Box::new(ast::Expression::Identifier("x".to_string())),
+            parameters: smallvec!["x".into(), "y".into()],
+            body: Box::new(ast::BlockStatement {
+                statements: smallvec![Box::new(ast::Statement::Expression(
+                    ast::Expression::Infix(ast::InfixExpression {
+                        left: Box::new(ast::Expression::Identifier("x".into())),
                         operator: Token::Plus,
-                        right: Box::new(ast::Expression::Identifier("y".to_string())),
-                    },
+                        right: Box::new(ast::Expression::Identifier("y".into())),
+                    },)
                 ))],
-            },
+            }),
         }),
     )];
 
@@ -32,7 +33,7 @@ fn parse_function_literal() -> Result<()> {
         program = parser.parse()?;
 
         let expected: Vec<ast::Statement> = vec![ast::Statement::Expression(test.2)];
-        assert_eq!(&program.statements, &expected);
+        assert_eq!(&program.statements.to_vec(), &expected);
         assert_eq!(format!("{}", program), test.1);
     }
     Ok(())
@@ -47,22 +48,22 @@ fn call_expression() -> Result<()> {
     let tests = vec![(
         "add(1, 2 * 3, 4 + 5);",
         "add(1, (2 * 3), (4 + 5))",
-        ast::Expression::Call(ast::CallExpression {
-            function: Box::new(ast::Expression::Identifier("add".to_string())),
-            arguments: vec![
-                ast::Expression::Int(1),
-                ast::Expression::Infix(ast::InfixExpression {
+        ast::Expression::Call(Box::new(ast::CallExpression {
+            function: Box::new(ast::Expression::Identifier("add".into())),
+            arguments: smallvec![
+                Box::new(ast::Expression::Int(1)),
+                Box::new(ast::Expression::Infix(ast::InfixExpression {
                     left: Box::new(ast::Expression::Int(2)),
                     operator: Token::Asterisk,
                     right: Box::new(ast::Expression::Int(3)),
-                }),
-                ast::Expression::Infix(ast::InfixExpression {
+                })),
+                Box::new(ast::Expression::Infix(ast::InfixExpression {
                     left: Box::new(ast::Expression::Int(4)),
                     operator: Token::Plus,
                     right: Box::new(ast::Expression::Int(5)),
-                }),
+                })),
             ],
-        }),
+        })),
     )];
 
     for test in tests {
@@ -71,7 +72,7 @@ fn call_expression() -> Result<()> {
         program = parser.parse()?;
 
         let expected: Vec<ast::Statement> = vec![ast::Statement::Expression(test.2)];
-        assert_eq!(&program.statements, &expected);
+        assert_eq!(&program.statements.to_vec(), &expected);
         assert_eq!(format!("{}", program), test.1);
     }
     Ok(())
@@ -87,45 +88,45 @@ fn counter() -> Result<()> {
         "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } };",
         "let counter = fn(x) { if (x > 100) { return true; } else { counter((x + 1)) } };",
         ast::LetStatement {
-            name: "counter".to_string(),
+            name: "counter".into(),
             value: ast::Expression::Function(ast::FunctionLiteral {
-                parameters: vec!["x".to_string()],
-                body: ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::If(
-                        ast::IfExpression {
+                parameters: smallvec!["x".into()],
+                body: Box::new(ast::BlockStatement {
+                    statements: smallvec![Box::new(ast::Statement::Expression(
+                        ast::Expression::If(ast::IfExpression {
                             condition: Box::new(ast::Expression::Infix(ast::InfixExpression {
-                                left: Box::new(ast::Expression::Identifier("x".to_string())),
+                                left: Box::new(ast::Expression::Identifier("x".into())),
                                 operator: Token::Gt,
                                 right: Box::new(ast::Expression::Int(100)),
                             })),
-                            consequence: ast::BlockStatement {
-                                statements: vec![ast::Statement::Return(
+                            consequence: Box::new(ast::BlockStatement {
+                                statements: smallvec![Box::new(ast::Statement::Return(
                                     ast::ReturnStatement {
                                         value: ast::Expression::Boolean(true),
                                     },
-                                )],
-                            },
-                            alternative: Some(ast::BlockStatement {
-                                statements: vec![ast::Statement::Expression(
-                                    ast::Expression::Call(ast::CallExpression {
+                                ))],
+                            }),
+                            alternative: Some(Box::new(ast::BlockStatement {
+                                statements: smallvec![Box::new(ast::Statement::Expression(
+                                    ast::Expression::Call(Box::new(ast::CallExpression {
                                         function: Box::new(ast::Expression::Identifier(
-                                            "counter".to_string(),
+                                            "counter".into(),
                                         )),
-                                        arguments: vec![ast::Expression::Infix(
+                                        arguments: smallvec![Box::new(ast::Expression::Infix(
                                             ast::InfixExpression {
                                                 left: Box::new(ast::Expression::Identifier(
-                                                    "x".to_string(),
+                                                    "x".into(),
                                                 )),
                                                 operator: Token::Plus,
                                                 right: Box::new(ast::Expression::Int(1)),
                                             },
-                                        )],
-                                    }),
-                                )],
-                            }),
-                        },
+                                        ))],
+                                    })),
+                                ))],
+                            })),
+                        },)
                     ))],
-                },
+                }),
             }),
         },
     )];
@@ -136,7 +137,7 @@ fn counter() -> Result<()> {
         program = parser.parse()?;
 
         let expected: Vec<ast::Statement> = vec![ast::Statement::Let(test.2)];
-        assert_eq!(&program.statements, &expected);
+        assert_eq!(&program.statements.to_vec(), &expected);
         // assert_eq!(program.statements.len(), 1);
         assert_eq!(format!("{}", program), test.1);
     }

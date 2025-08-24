@@ -395,6 +395,7 @@ dependencies = [
  "clap",
  "criterion",
  "rustyline",
+ "smallvec",
 ]
 
 [[package]]

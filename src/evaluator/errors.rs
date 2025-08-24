@@ -25,9 +25,7 @@ pub enum EvaluatorError {
         position: Option<Position>,
     },
     /// Division by zero error
-    DivisionByZero {
-        position: Option<Position>,
-    },
+    DivisionByZero { position: Option<Position> },
     /// Invalid function call (wrong arity, not callable, etc.)
     InvalidFunctionCall {
         message: String,
@@ -130,42 +128,66 @@ impl fmt::Display for EvaluatorError {
         match self {
             EvaluatorError::TypeError { message, position } => {
                 if let Some(pos) = position {
-                    write!(f, "Type error at line {}, column {}: {}", pos.line, pos.column, message)
+                    write!(
+                        f,
+                        "Type error at line {}, column {}: {}",
+                        pos.line, pos.column, message
+                    )
                 } else {
                     write!(f, "Type error: {}", message)
                 }
             }
             EvaluatorError::RuntimeError { message, position } => {
                 if let Some(pos) = position {
-                    write!(f, "Runtime error at line {}, column {}: {}", pos.line, pos.column, message)
+                    write!(
+                        f,
+                        "Runtime error at line {}, column {}: {}",
+                        pos.line, pos.column, message
+                    )
                 } else {
                     write!(f, "Runtime error: {}", message)
                 }
             }
             EvaluatorError::IdentifierNotFound { name, position } => {
                 if let Some(pos) = position {
-                    write!(f, "Identifier '{}' not found at line {}, column {}", name, pos.line, pos.column)
+                    write!(
+                        f,
+                        "Identifier '{}' not found at line {}, column {}",
+                        name, pos.line, pos.column
+                    )
                 } else {
                     write!(f, "Identifier '{}' not found", name)
                 }
             }
             EvaluatorError::DivisionByZero { position } => {
                 if let Some(pos) = position {
-                    write!(f, "Division by zero at line {}, column {}", pos.line, pos.column)
+                    write!(
+                        f,
+                        "Division by zero at line {}, column {}",
+                        pos.line, pos.column
+                    )
                 } else {
                     write!(f, "Division by zero")
                 }
             }
             EvaluatorError::InvalidFunctionCall { message, position } => {
                 if let Some(pos) = position {
-                    write!(f, "Invalid function call at line {}, column {}: {}", pos.line, pos.column, message)
+                    write!(
+                        f,
+                        "Invalid function call at line {}, column {}: {}",
+                        pos.line, pos.column, message
+                    )
                 } else {
                     write!(f, "Invalid function call: {}", message)
                 }
             }
             EvaluatorError::InvalidIndex { message, position } => {
                 if let Some(pos) = position {
-                    write!(f, "Invalid index at line {}, column {}: {}", pos.line, pos.column, message)
+                    write!(
+                        f,
+                        "Invalid index at line {}, column {}: {}",
+                        pos.line, pos.column, message
+                    )
                 } else {
                     write!(f, "Invalid index: {}", message)
                 }

@@ -35,9 +35,9 @@
 //! ```
 
 mod builtins;
+mod errors;
 mod expressions;
 mod operators;
-mod errors;
 mod statements;
 
 use crate::ast::Node;
@@ -100,6 +100,7 @@ mod tests {
     use crate::object::{ArrayLiteral, Object};
     use crate::parser::Parser;
     use crate::token::Token;
+    use smallvec::smallvec;
     use std::collections::BTreeMap;
 
     fn test_eval(input: &str) -> Result<Object> {
@@ -254,9 +255,18 @@ f(10);",
     #[test]
     fn error_handling() -> Result<()> {
         let tests = vec![
-            ("5 + true;", Err(EvaluatorError::type_error("type mismatch: 5 + true"))),
-            ("5 + true; 5;", Err(EvaluatorError::type_error("type mismatch: 5 + true"))),
-            ("-true;", Err(EvaluatorError::type_error("unknown operator: -true"))),
+            (
+                "5 + true;",
+                Err(EvaluatorError::type_error("type mismatch: 5 + true")),
+            ),
+            (
+                "5 + true; 5;",
+                Err(EvaluatorError::type_error("type mismatch: 5 + true")),
+            ),
+            (
+                "-true;",
+                Err(EvaluatorError::type_error("unknown operator: -true")),
+            ),
             (
                 "true + false;",
                 Err(EvaluatorError::type_error("unknown operator: true + false")),
@@ -281,10 +291,15 @@ f(10);",
                 "if (10 > 1) { if (10 > 1) { return true + false; } return 1; }",
                 Err(EvaluatorError::type_error("unknown operator: true + false")),
             ),
-            ("foobar;", Err(EvaluatorError::identifier_not_found("foobar"))),
+            (
+                "foobar;",
+                Err(EvaluatorError::identifier_not_found("foobar")),
+            ),
             (
                 r#""Hello" - "World""#,
-                Err(EvaluatorError::type_error("unknown operator: 'Hello' - 'World'")),
+                Err(EvaluatorError::type_error(
+                    "unknown operator: 'Hello' - 'World'",
+                )),
             ),
             (
                 r#"{"name": "Monkey"}[fn(x) { x }];"#,
@@ -327,14 +342,14 @@ f(10);",
         let tests = vec![(
             "fn(x) { x + 2; };",
             Object::Function(object::Function {
-                parameters: vec!["x".to_string()],
+                parameters: smallvec!["x".into()],
                 body: ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::Infix(
-                        ast::InfixExpression {
-                            left: Box::new(ast::Expression::Identifier("x".to_string())),
+                    statements: smallvec![Box::new(ast::Statement::Expression(
+                        ast::Expression::Infix(ast::InfixExpression {
+                            left: Box::new(ast::Expression::Identifier("x".into())),
                             operator: Token::Plus,
                             right: Box::new(ast::Expression::Int(2)),
-                        },
+                        },)
                     ))],
                 },
                 env: Environment::new(),
@@ -423,7 +438,7 @@ addTwo(2);
         let input = r#""Hello" + " " + "World!""#;
 
         let object = test_eval(input)?;
-        assert_eq!(object, Object::String("Hello World!".to_string()));
+        assert_eq!(object, Object::String("Hello World!".into()));
 
         Ok(())
     }
@@ -435,9 +450,13 @@ addTwo(2);
         let object = test_eval(input)?;
         assert_eq!(
             object,
-            Object::Array(object::ArrayLiteral {
-                elements: vec![Object::Int(1), Object::Int(4), Object::Int(6)]
-            })
+            Object::Array(Box::new(ArrayLiteral {
+                elements: smallvec![
+                    Box::new(Object::Int(1)),
+                    Box::new(Object::Int(4)),
+                    Box::new(Object::Int(6))
+                ]
+            }))
         );
 
         Ok(())
@@ -533,14 +552,14 @@ map(a, double);
         let object = test_eval(input)?;
         assert_eq!(
             object,
-            Object::Array(ArrayLiteral {
-                elements: vec![
-                    Object::Int(2),
-                    Object::Int(4),
-                    Object::Int(6),
-                    Object::Int(8)
+            Object::Array(Box::new(ArrayLiteral {
+                elements: smallvec![
+                    Box::new(Object::Int(2)),
+                    Box::new(Object::Int(4)),
+                    Box::new(Object::Int(6)),
+                    Box::new(Object::Int(8))
                 ]
-            })
+            }))
         );
 
         Ok(())
@@ -586,9 +605,9 @@ sum([1, 2, 3, 4, 5]);
 
         let object = test_eval(input)?;
         let expected: BTreeMap<Object, Object> = BTreeMap::from([
-            (Object::String("one".to_string()), Object::Int(1)),
-            (Object::String("two".to_string()), Object::Int(2)),
-            (Object::String("three".to_string()), Object::Int(3)),
+            (Object::String("one".into()), Object::Int(1)),
+            (Object::String("two".into()), Object::Int(2)),
+            (Object::String("three".into()), Object::Int(3)),
             (Object::Int(4), Object::Int(4)),
             (Object::Boolean(true), Object::Int(5)),
             (Object::Boolean(false), Object::Int(6)),
@@ -625,22 +644,16 @@ sum([1, 2, 3, 4, 5]);
     #[test]
     fn string_escape_sequences() -> Result<()> {
         let tests: Vec<(&str, Object)> = vec![
-            (
-                r#""hello\nworld""#,
-                Object::String("hello\nworld".to_string()),
-            ),
-            (r#""tab\there""#, Object::String("tab\there".to_string())),
-            (
-                r#""quote\"here""#,
-                Object::String("quote\"here".to_string()),
-            ),
+            (r#""hello\nworld""#, Object::String("hello\nworld".into())),
+            (r#""tab\there""#, Object::String("tab\there".into())),
+            (r#""quote\"here""#, Object::String("quote\"here".into())),
             (
                 r#""backslash\\here""#,
-                Object::String("backslash\\here".to_string()),
+                Object::String("backslash\\here".into()),
             ),
             (
                 r#""multiple\n\t\"\\\r""#,
-                Object::String("multiple\n\t\"\\\r".to_string()),
+                Object::String("multiple\n\t\"\\\r".into()),
             ),
         ];
 
@@ -658,21 +671,25 @@ sum([1, 2, 3, 4, 5]);
             // Basic assignment
             ("let x = 5; x = 10; x;", Object::Int(10)),
             ("let x = 5; x = x + 1; x;", Object::Int(6)),
-            
             // Multiple assignments
             ("let x = 5; let y = 10; x = y; x;", Object::Int(10)),
-            
             // Assignment with expressions
             ("let x = 5; x = 10 * 2; x;", Object::Int(20)),
             ("let x = 5; let y = 3; x = x * y + 1; x;", Object::Int(16)),
-            
             // Assignment with function calls
-            ("let add = fn(a, b) { a + b; }; let x = 5; x = add(x, 10); x;", Object::Int(15)),
-            
+            (
+                "let add = fn(a, b) { a + b; }; let x = 5; x = add(x, 10); x;",
+                Object::Int(15),
+            ),
             // String assignment
-            ("let x = \"hello\"; x = \"world\"; x;", Object::String("world".to_string())),
-            ("let x = \"hello\"; x = x + \" world\"; x;", Object::String("hello world".to_string())),
-            
+            (
+                "let x = \"hello\"; x = \"world\"; x;",
+                Object::String("world".into()),
+            ),
+            (
+                "let x = \"hello\"; x = x + \" world\"; x;",
+                Object::String("hello world".into()),
+            ),
             // Boolean assignment
             ("let x = true; x = false; x;", Object::Boolean(false)),
             ("let x = true; x = !x; x;", Object::Boolean(false)),
@@ -692,7 +709,7 @@ sum([1, 2, 3, 4, 5]);
         let tests: Vec<(&str, Object)> = vec![
             ("let x = 5; x = 10", Object::Int(10)), // Assignment returns value
             ("let x = true; x = false", Object::Boolean(false)),
-            ("let x = \"old\"; x = \"new\"", Object::String("new".to_string())),
+            ("let x = \"old\"; x = \"new\"", Object::String("new".into())),
         ];
 
         for (input, expected) in tests {
@@ -736,19 +753,19 @@ sum([1, 2, 3, 4, 5]);
         let tests: Vec<(&str, Object)> = vec![
             // Basic while loop
             ("let i = 0; while (i < 3) { i = i + 1; } i;", Object::Int(3)),
-            
+
             // While loop with different conditions  
             ("let x = 10; while (x > 5) { x = x - 1; } x;", Object::Int(5)),
-            
+
             // While loop that doesn't execute
             ("let j = 5; while (j < 0) { j = j + 1; } j;", Object::Int(5)),
-            
+
             // While loop with accumulator
             ("let sum = 0; let i = 1; while (i <= 3) { sum = sum + i; i = i + 1; } sum;", Object::Int(6)),
-            
+
             // While loop with boolean condition
             ("let flag = true; let count = 0; while (flag) { count = count + 1; if (count >= 2) { flag = false; } } count;", Object::Int(2)),
-            
+
             // While loop that returns early
             ("let test = fn() { let i = 0; while (i < 10) { if (i == 3) { return i; } i = i + 1; } return -1; }; test();", Object::Int(3)),
         ];
@@ -766,10 +783,10 @@ sum([1, 2, 3, 4, 5]);
         let tests: Vec<(&str, Object)> = vec![
             // Empty body while loop
             ("let x = 0; while (false) { } x;", Object::Int(0)),
-            
+
             // Complex condition
             ("let a = 1; while (a < 5) { a = a + 1; } a;", Object::Int(5)),
-            
+
             // Nested variable access
             ("let outer = 10; while (outer > 8) { let inner = 5; outer = outer - inner + 3; } outer;", Object::Int(8)),
         ];
@@ -799,10 +816,10 @@ sum([1, 2, 3, 4, 5]);
             };
             fibonacci(5);
         "#;
-        
+
         let evaluated = test_eval(input)?;
         assert_eq!(evaluated, Object::Int(5)); // 5th Fibonacci number
-        
+
         Ok(())
     }
 
@@ -812,27 +829,34 @@ sum([1, 2, 3, 4, 5]);
             // Simple for loop over array elements
             ("for (x in [1, 2, 3]) { x }", Object::Int(3)), // Returns last iteration value
             ("let arr = [1, 2, 3]; for (x in arr) { x }", Object::Int(3)), // Returns last iteration value
-
             // For loop with accumulator
-            (r#"
+            (
+                r#"
                 let sum = 0;
                 for (x in [1, 2, 3, 4, 5]) {
                     sum = sum + x;
                 }
                 sum;
-            "#, Object::Int(15)),
-
+            "#,
+                Object::Int(15),
+            ),
             // For loop with complex expressions
-            (r#"
+            (
+                r#"
                 let result = [];
                 for (x in [1, 2, 3]) {
                     result = push(result, x * 2);
                 }
                 result;
-            "#, Object::Array(ArrayLiteral {
-                elements: vec![Object::Int(2), Object::Int(4), Object::Int(6)],
-            })),
-
+            "#,
+                Object::Array(Box::new(ArrayLiteral {
+                    elements: smallvec![
+                        Box::new(Object::Int(2)),
+                        Box::new(Object::Int(4)),
+                        Box::new(Object::Int(6))
+                    ],
+                })),
+            ),
             // Empty array
             ("for (x in []) { x }", Object::Null),
         ];
@@ -841,7 +865,7 @@ sum([1, 2, 3, 4, 5]);
             let evaluated = test_eval(input)?;
             assert_eq!(evaluated, expected);
         }
-        
+
         Ok(())
     }
 
@@ -849,29 +873,34 @@ sum([1, 2, 3, 4, 5]);
     fn for_loop_hash_iteration() -> Result<()> {
         let tests: Vec<(&str, usize)> = vec![
             // Simple for loop over hash keys - count iterations
-            (r#"
+            (
+                r#"
                 let count = 0;
                 for (key in {"a": 1, "b": 2, "c": 3}) {
                     count = count + 1;
                 }
                 count;
-            "#, 3),
-            
+            "#,
+                3,
+            ),
             // Empty hash
-            (r#"
+            (
+                r#"
                 let count = 0;
                 for (key in {}) {
                     count = count + 1;
                 }
                 count;
-            "#, 0),
+            "#,
+                0,
+            ),
         ];
 
         for (input, expected_count) in tests {
             let evaluated = test_eval(input)?;
             assert_eq!(evaluated, Object::Int(expected_count as isize));
         }
-        
+
         Ok(())
     }
 
@@ -885,10 +914,10 @@ sum([1, 2, 3, 4, 5]);
             }
             x; // Should still be 10
         "#;
-        
+
         let evaluated = test_eval(input)?;
         assert_eq!(evaluated, Object::Int(10));
-        
+
         Ok(())
     }
 
@@ -906,10 +935,10 @@ sum([1, 2, 3, 4, 5]);
             };
             find_first([1, 2, 3, 4, 5], 3);
         "#;
-        
+
         let evaluated = test_eval(input)?;
         assert_eq!(evaluated, Object::Int(3));
-        
+
         Ok(())
     }
 
@@ -926,7 +955,7 @@ sum([1, 2, 3, 4, 5]);
             let result = test_eval(input);
             assert!(result.is_err(), "Expected error for input: {}", input);
         }
-        
+
         Ok(())
     }
 }

@@ -4,6 +4,7 @@
 //! by the lexer. Tokens represent the basic building blocks of Monkey programs.
 
 mod fmt;
+pub mod intern;
 
 /// Represents a token in the Monkey programming language.
 ///
@@ -16,7 +17,7 @@ mod fmt;
 /// ```
 /// use monkey_interpreter_rs::token::Token;
 ///
-/// let identifier = Token::Ident("variable".to_string());
+/// let identifier = Token::Ident("variable".into());
 /// let number = Token::Int(42);
 /// let operator = Token::Plus;
 /// ```
@@ -27,11 +28,11 @@ pub enum Token {
 
     // Identifiers + literals
     /// Variable or function identifier
-    Ident(String),
+    Ident(Box<str>),
     /// Integer literal  
     Int(isize),
     /// String literal
-    String(String),
+    String(Box<str>),
 
     // Operators
     /// Assignment operator `=`

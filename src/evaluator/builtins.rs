@@ -1,4 +1,5 @@
 use crate::object::{ArrayLiteral, BuiltinFunction, Object};
+use smallvec::smallvec;
 
 fn builtin_len(args: &[Object]) -> Object {
     if args.len() != 1 {
@@ -23,7 +24,7 @@ fn builtin_first(args: &[Object]) -> Object {
     }
     match &args[0] {
         Object::Array(array_literal) if !array_literal.elements.is_empty() => {
-            array_literal.elements[0].clone()
+            *array_literal.elements[0].clone()
         }
         Object::Array(_array_literal) => {
             Object::Error("an empty array has no first element".to_string())
@@ -41,7 +42,7 @@ fn builtin_last(args: &[Object]) -> Object {
     }
     match &args[0] {
         Object::Array(array_literal) if !array_literal.elements.is_empty() => {
-            array_literal.elements[array_literal.elements.len() - 1].clone()
+            *array_literal.elements[array_literal.elements.len() - 1].clone()
         }
         Object::Array(_array_literal) => {
             Object::Error("an empty array has no last element".to_string())
@@ -60,11 +61,13 @@ fn builtin_rest(args: &[Object]) -> Object {
     match &args[0] {
         Object::Array(array_literal) => {
             if !array_literal.elements.is_empty() {
-                return Object::Array(ArrayLiteral {
-                    elements: array_literal.elements[1..].to_vec(),
-                });
+                return Object::Array(Box::new(ArrayLiteral {
+                    elements: array_literal.elements[1..].iter().cloned().collect(),
+                }));
             }
-            Object::Array(ArrayLiteral { elements: vec![] })
+            Object::Array(Box::new(ArrayLiteral {
+                elements: smallvec![],
+            }))
         }
         other => Object::Error(format!("argument to `last` must be ARRAY, got {other}",)),
     }
@@ -81,10 +84,8 @@ fn builtin_push(args: &[Object]) -> Object {
     let array = args[0].clone();
     match array {
         Object::Array(mut array_literal) => {
-            array_literal.elements.push(element);
-            Object::Array(ArrayLiteral {
-                elements: array_literal.elements,
-            })
+            array_literal.elements.push(Box::new(element));
+            Object::Array(array_literal)
         }
         other => Object::Error(format!("argument to `last` must be ARRAY, got {other}",)),
     }
@@ -128,19 +129,11 @@ fn builtin_int(args: &[Object]) -> Object {
         ));
     }
     match &args[0] {
-        Object::String(value) => {
-            match value.parse::<isize>() {
-                Ok(num) => Object::Int(num),
-                Err(_) => Object::Error(format!(
-                    "cannot convert string '{}' to integer",
-                    value
-                )),
-            }
-        }
-        other => Object::Error(format!(
-            "argument to `int` must be a string, got {}",
-            other
-        )),
+        Object::String(value) => match value.parse::<isize>() {
+            Ok(num) => Object::Int(num),
+            Err(_) => Object::Error(format!("cannot convert string '{}' to integer", value)),
+        },
+        other => Object::Error(format!("argument to `int` must be a string, got {}", other)),
     }
 }
 
@@ -152,13 +145,13 @@ fn builtin_string(args: &[Object]) -> Object {
         ));
     }
     match &args[0] {
-        Object::Int(value) => Object::String(value.to_string()),
+        Object::Int(value) => Object::String(value.to_string().into()),
         Object::Array(_) | Object::Hash(_) => {
-            Object::String(format!("{}", args[0]))
+            Object::String(format!("{}", args[0]).into())
         },
-        Object::String(value) => Object::String(value.to_string()),
-        Object::Boolean(value) => Object::String(value.to_string()),
-        Object::Null => Object::String("null".to_string()),
+        Object::String(value) => Object::String(value.clone()),
+        Object::Boolean(value) => Object::String(value.to_string().into()),
+        Object::Null => Object::String("null".into()),
         other => Object::Error(format!(
             "argument to `string` must be an integer, array, hash, string, boolean, or null, got {}",
             other
@@ -191,20 +184,36 @@ mod tests {
     fn test_builtin_int() {
         let tests = vec![
             // Valid conversions
-            (vec![Object::String("123".to_string())], Object::Int(123)),
-            (vec![Object::String("0".to_string())], Object::Int(0)),
-            (vec![Object::String("-456".to_string())], Object::Int(-456)),
-            (vec![Object::String("007".to_string())], Object::Int(7)),
-            
+            (vec![Object::String("123".into())], Object::Int(123)),
+            (vec![Object::String("0".into())], Object::Int(0)),
+            (vec![Object::String("-456".into())], Object::Int(-456)),
+            (vec![Object::String("007".into())], Object::Int(7)),
             // Error cases - invalid string format
-            (vec![Object::String("abc".to_string())], Object::Error("cannot convert string 'abc' to integer".to_string())),
-            (vec![Object::String("".to_string())], Object::Error("cannot convert string '' to integer".to_string())),
-            (vec![Object::String("12.34".to_string())], Object::Error("cannot convert string '12.34' to integer".to_string())),
-            
+            (
+                vec![Object::String("abc".into())],
+                Object::Error("cannot convert string 'abc' to integer".to_string()),
+            ),
+            (
+                vec![Object::String("".into())],
+                Object::Error("cannot convert string '' to integer".to_string()),
+            ),
+            (
+                vec![Object::String("12.34".into())],
+                Object::Error("cannot convert string '12.34' to integer".to_string()),
+            ),
             // Error cases - wrong argument type
-            (vec![Object::Int(123)], Object::Error("argument to `int` must be a string, got 123".to_string())),
-            (vec![Object::Boolean(true)], Object::Error("argument to `int` must be a string, got true".to_string())),
-            (vec![Object::Null], Object::Error("argument to `int` must be a string, got null".to_string())),
+            (
+                vec![Object::Int(123)],
+                Object::Error("argument to `int` must be a string, got 123".to_string()),
+            ),
+            (
+                vec![Object::Boolean(true)],
+                Object::Error("argument to `int` must be a string, got true".to_string()),
+            ),
+            (
+                vec![Object::Null],
+                Object::Error("argument to `int` must be a string, got null".to_string()),
+            ),
         ];
 
         for (args, expected) in tests {
@@ -218,7 +227,7 @@ mod tests {
             Object::Error("wrong number of arguments. got=0, want=1".to_string())
         );
         assert_eq!(
-            builtin_int(&[Object::String("123".to_string()), Object::String("456".to_string())]),
+            builtin_int(&[Object::String("123".into()), Object::String("456".into())]),
             Object::Error("wrong number of arguments. got=2, want=1".to_string())
         );
     }
@@ -227,19 +236,28 @@ mod tests {
     fn test_builtin_string() {
         let tests = vec![
             // Valid conversions
-            (vec![Object::Int(123)], Object::String("123".to_string())),
-            (vec![Object::Int(0)], Object::String("0".to_string())),
-            (vec![Object::Int(-456)], Object::String("-456".to_string())),
-            (vec![Object::Array(ArrayLiteral{
-                elements: vec![Object::Int(1), Object::Int(2)]
-            })], Object::String("[1, 2]".to_string())),
-            (vec![Object::Hash(HashLiteral{
-                pairs: BTreeMap::new()
-            })], Object::String("{}".to_string())),
-            (vec![Object::String("-456".to_string())], Object::String("-456".to_string())),
-            (vec![Object::Boolean(true)], Object::String("true".to_string())),
-            (vec![Object::Boolean(false)], Object::String("false".to_string())),
-            (vec![Object::Null], Object::String("null".to_string())),
+            (vec![Object::Int(123)], Object::String("123".into())),
+            (vec![Object::Int(0)], Object::String("0".into())),
+            (vec![Object::Int(-456)], Object::String("-456".into())),
+            (
+                vec![Object::Array(Box::new(ArrayLiteral {
+                    elements: smallvec![Box::new(Object::Int(1)), Box::new(Object::Int(2))],
+                }))],
+                Object::String("[1, 2]".into()),
+            ),
+            (
+                vec![Object::Hash(HashLiteral {
+                    pairs: BTreeMap::new(),
+                })],
+                Object::String("{}".into()),
+            ),
+            (
+                vec![Object::String("-456".into())],
+                Object::String("-456".into()),
+            ),
+            (vec![Object::Boolean(true)], Object::String("true".into())),
+            (vec![Object::Boolean(false)], Object::String("false".into())),
+            (vec![Object::Null], Object::String("null".into())),
         ];
 
         for (args, expected) in tests {
@@ -263,19 +281,19 @@ mod tests {
         // Test that the casting functions are properly registered
         let int_builtin = get_builtin("int");
         let string_builtin = get_builtin("string");
-        
+
         assert!(matches!(int_builtin, Object::Builtin(_)));
         assert!(matches!(string_builtin, Object::Builtin(_)));
-        
+
         // Test that we can actually call them through the builtin interface
         if let Object::Builtin(int_fn) = int_builtin {
-            let result = (int_fn.f)(&[Object::String("42".to_string())]);
+            let result = (int_fn.f)(&[Object::String("42".into())]);
             assert_eq!(result, Object::Int(42));
         }
-        
+
         if let Object::Builtin(string_fn) = string_builtin {
             let result = (string_fn.f)(&[Object::Int(42)]);
-            assert_eq!(result, Object::String("42".to_string()));
+            assert_eq!(result, Object::String("42".into()));
         }
     }
 }

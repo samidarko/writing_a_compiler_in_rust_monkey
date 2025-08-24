@@ -2,10 +2,13 @@ use crate::ast::{Expression, Node, Statement};
 use crate::object::environment::{Env, Environment};
 use crate::object::{ArrayLiteral, HashLiteral, Object};
 use crate::{ast, object};
+use smallvec::SmallVec;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use super::{builtins, eval, eval_infix_expression, eval_prefix_expression, EvaluatorError, Result};
+use super::{
+    builtins, eval, eval_infix_expression, eval_prefix_expression, EvaluatorError, Result,
+};
 
 pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<Object> {
     let object = match expression {
@@ -40,7 +43,7 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
         Expression::If(if_expression) => return eval_if_expression(if_expression, environment),
         Expression::Function(function_literal) => Object::Function(object::Function {
             parameters: function_literal.parameters,
-            body: function_literal.body,
+            body: *function_literal.body,
             env: Rc::clone(&environment), // capture shared env
         }),
         Expression::Call(call_expression) => {
@@ -48,17 +51,35 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
                 Node::Expression(*call_expression.function),
                 Rc::clone(&environment),
             )?;
-            let args = eval_expressions(call_expression.arguments, Rc::clone(&environment))?;
+            let args = eval_expressions(
+                call_expression
+                    .arguments
+                    .iter()
+                    .map(|e| (**e).clone())
+                    .collect::<Vec<_>>()
+                    .into(),
+                Rc::clone(&environment),
+            )?;
             return apply_function(func_obj, &args);
         }
         Expression::Array(array_literal) => {
-            let elements = eval_expressions(array_literal.elements, Rc::clone(&environment))?;
+            let elements = eval_expressions(
+                array_literal
+                    .elements
+                    .iter()
+                    .map(|e| (**e).clone())
+                    .collect::<Vec<_>>()
+                    .into(),
+                Rc::clone(&environment),
+            )?;
             if elements.len() == 1 {
                 if let Object::Error(_) = elements[0] {
                     return Ok(elements[0].clone());
                 }
             }
-            Object::Array(ArrayLiteral { elements })
+            Object::Array(Box::new(ArrayLiteral {
+                elements: elements.into_iter().map(Box::new).collect(),
+            }))
         }
         Expression::Index(index_expression) => {
             let left = eval_expression(*(index_expression.left), Rc::clone(&environment))?;
@@ -76,12 +97,23 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
         }
         Expression::Assignment(assignment_expression) => {
             // Check if variable exists before allowing assignment
-            if environment.borrow().get(&assignment_expression.name).is_none() {
-                return Err(EvaluatorError::identifier_not_found(&assignment_expression.name));
+            if environment
+                .borrow()
+                .get(&assignment_expression.name)
+                .is_none()
+            {
+                return Err(EvaluatorError::identifier_not_found(
+                    &*assignment_expression.name,
+                ));
             }
-            
-            let value = eval(Node::Expression(*assignment_expression.value), Rc::clone(&environment))?;
-            environment.borrow_mut().set(&assignment_expression.name, &value);
+
+            let value = eval(
+                Node::Expression(*assignment_expression.value),
+                Rc::clone(&environment),
+            )?;
+            environment
+                .borrow_mut()
+                .set(&assignment_expression.name, &value);
             return Ok(value.clone()); // Assignment returns the assigned value
         }
         Expression::While(while_expression) => {
@@ -94,7 +126,10 @@ pub fn eval_expression(expression: ast::Expression, environment: Env) -> Result<
     Ok(object)
 }
 
-pub fn eval_expressions(expressions: Vec<Expression>, environment: Env) -> Result<Vec<Object>> {
+pub fn eval_expressions(
+    expressions: SmallVec<[Expression; 4]>,
+    environment: Env,
+) -> Result<Vec<Object>> {
     let mut objects = vec![];
 
     for expression in expressions {
@@ -139,7 +174,10 @@ pub fn apply_function(function: Object, arguments: &[Object]) -> Result<Object> 
             Ok(unwrap_return_value(evaluated))
         }
         Object::Builtin(f) => Ok((f.f)(arguments)),
-        _ => Err(EvaluatorError::invalid_function_call(format!("not a function: {}", function))),
+        _ => Err(EvaluatorError::invalid_function_call(format!(
+            "not a function: {}",
+            function
+        ))),
     }
 }
 
@@ -168,11 +206,11 @@ pub fn eval_if_expression(if_expression: ast::IfExpression, environment: Env) ->
 
     if is_truthy(condition) {
         eval(
-            Node::Statement(Statement::Block(if_expression.consequence)),
+            Node::Statement(Statement::Block(*if_expression.consequence)),
             environment,
         )
     } else if let Some(alternative) = if_expression.alternative {
-        eval(Node::Statement(Statement::Block(alternative)), environment)
+        eval(Node::Statement(Statement::Block(*alternative)), environment)
     } else {
         Ok(Object::Null)
     }
@@ -190,7 +228,7 @@ pub fn eval_index_expression(left: Object, index: Object) -> Object {
             if index < 0 || index > max {
                 return Object::Error(format!("index out of range: {}", index));
             }
-            array_literal.elements[index as usize].clone()
+            *array_literal.elements[index as usize].clone()
         }
         (Object::Hash(hash_literal), key) => match key {
             Object::Int(_) | Object::Boolean(_) | Object::String(_) => {
@@ -205,9 +243,12 @@ pub fn eval_index_expression(left: Object, index: Object) -> Object {
     }
 }
 
-pub fn eval_while_expression(while_expression: ast::WhileExpression, environment: Env) -> Result<Object> {
+pub fn eval_while_expression(
+    while_expression: ast::WhileExpression,
+    environment: Env,
+) -> Result<Object> {
     let mut result = Object::Null;
-    
+
     loop {
         let condition = eval(
             Node::Expression(*while_expression.condition.clone()),
@@ -219,83 +260,95 @@ pub fn eval_while_expression(while_expression: ast::WhileExpression, environment
         }
 
         result = eval(
-            Node::Statement(Statement::Block(while_expression.body.clone())),
+            Node::Statement(Statement::Block(*while_expression.body.clone())),
             Rc::clone(&environment),
         )?;
-        
+
         // Handle return values - if we encounter a return, break out of the loop
         if matches!(result, Object::Return(_)) {
             break;
         }
     }
-    
+
     Ok(result)
 }
 
 pub fn eval_for_expression(for_expression: ast::ForExpression, environment: Env) -> Result<Object> {
     let mut result = Object::Null;
-    
+
     // Evaluate the collection expression
     let collection = eval(
         Node::Expression(*for_expression.collection.clone()),
         Rc::clone(&environment),
     )?;
-    
+
     match collection {
         Object::Array(array) => {
             // Save the original value of the loop variable (if it exists)
             let original_value = environment.borrow().get(&for_expression.variable);
-            
-            for element in array.elements {
+
+            for element in array.elements.iter() {
                 // Set the loop variable to the current array element in the current environment
-                environment.borrow_mut().set(&for_expression.variable, &element);
-                
+                environment
+                    .borrow_mut()
+                    .set(&for_expression.variable, element);
+
                 result = eval(
-                    Node::Statement(Statement::Block(for_expression.body.clone())),
+                    Node::Statement(Statement::Block(*for_expression.body.clone())),
                     Rc::clone(&environment),
                 )?;
-                
+
                 // Handle return values - if we encounter a return, break out of the loop
                 if matches!(result, Object::Return(_)) {
                     break;
                 }
             }
-            
+
             // Restore the original value of the loop variable (or remove it if it didn't exist)
             match original_value {
-                Some(value) => environment.borrow_mut().set(&for_expression.variable, &value),
+                Some(value) => environment
+                    .borrow_mut()
+                    .set(&for_expression.variable, &value),
                 None => {
                     // Remove the loop variable from the environment
-                    environment.borrow_mut().store.remove(&for_expression.variable);
+                    environment
+                        .borrow_mut()
+                        .store
+                        .remove(for_expression.variable.as_ref());
                 }
             }
         }
         Object::Hash(hash_map) => {
             // Save the original value of the loop variable (if it exists)
             let original_value = environment.borrow().get(&for_expression.variable);
-            
+
             // For hash maps, iterate over keys only
             for key in hash_map.pairs.keys() {
                 // Set the loop variable to the current hash key in the current environment
                 environment.borrow_mut().set(&for_expression.variable, key);
-                
+
                 result = eval(
-                    Node::Statement(Statement::Block(for_expression.body.clone())),
+                    Node::Statement(Statement::Block(*for_expression.body.clone())),
                     Rc::clone(&environment),
                 )?;
-                
+
                 // Handle return values - if we encounter a return, break out of the loop
                 if matches!(result, Object::Return(_)) {
                     break;
                 }
             }
-            
+
             // Restore the original value of the loop variable (or remove it if it didn't exist)
             match original_value {
-                Some(value) => environment.borrow_mut().set(&for_expression.variable, &value),
+                Some(value) => environment
+                    .borrow_mut()
+                    .set(&for_expression.variable, &value),
                 None => {
                     // Remove the loop variable from the environment
-                    environment.borrow_mut().store.remove(&for_expression.variable);
+                    environment
+                        .borrow_mut()
+                        .store
+                        .remove(for_expression.variable.as_ref());
                 }
             }
         }
@@ -306,6 +359,6 @@ pub fn eval_for_expression(for_expression: ast::ForExpression, environment: Env)
             )));
         }
     }
-    
+
     Ok(result)
 }

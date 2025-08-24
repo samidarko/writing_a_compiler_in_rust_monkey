@@ -1,5 +1,7 @@
 use clap::{Arg, Command};
-use monkey_interpreter_rs::{evaluator, lexer::Lexer, object::environment::Environment, parser::Parser, repl};
+use monkey_interpreter_rs::{
+    evaluator, lexer::Lexer, object::environment::Environment, parser::Parser, repl,
+};
 use std::fs;
 
 fn main() -> Result<(), String> {
@@ -35,7 +37,7 @@ fn main() -> Result<(), String> {
             // Use enhanced REPL
             repl::enhanced_repl()?
         };
-        
+
         if exit_code != 0 {
             std::process::exit(exit_code);
         }

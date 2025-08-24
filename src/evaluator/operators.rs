@@ -15,7 +15,10 @@ pub fn eval_bang_operator_expression(right: Object) -> Object {
 pub fn eval_minus_operator_expression(right: Object) -> Result<Object> {
     match right {
         Object::Int(value) => Ok(Object::Int(-value)),
-        _ => Err(EvaluatorError::type_error(format!("unknown operator: -{}", right))),
+        _ => Err(EvaluatorError::type_error(format!(
+            "unknown operator: -{}",
+            right
+        ))),
     }
 }
 
@@ -23,7 +26,10 @@ pub fn eval_prefix_expression(operator: Token, right: Object) -> Result<Object> 
     match operator {
         Token::Bang => Ok(eval_bang_operator_expression(right)),
         Token::Minus => eval_minus_operator_expression(right),
-        _ => Err(EvaluatorError::type_error(format!("unknown operator: {}{}", operator, right))),
+        _ => Err(EvaluatorError::type_error(format!(
+            "unknown operator: {}{}",
+            operator, right
+        ))),
     }
 }
 
@@ -38,9 +44,17 @@ pub fn eval_infix_expression(operator: Token, left: Object, right: Object) -> Re
             eval_string_infix_expression(operator, left, right)?
         }
         (_, left, right) if !left.is_same_variant(right) => {
-            return Err(EvaluatorError::type_error(format!("type mismatch: {} {} {}", left, operator, right)))
+            return Err(EvaluatorError::type_error(format!(
+                "type mismatch: {} {} {}",
+                left, operator, right
+            )))
         }
-        _ => return Err(EvaluatorError::type_error(format!("unknown operator: {} {} {}", left, operator, right))),
+        _ => {
+            return Err(EvaluatorError::type_error(format!(
+                "unknown operator: {} {} {}",
+                left, operator, right
+            )))
+        }
     };
     Ok(object)
 }
@@ -92,7 +106,7 @@ pub fn eval_string_infix_expression(
         Object::String(s) => s,
         _ => return Err(EvaluatorError::type_error("right operand is not a string")),
     };
-    
-    let object = Object::String(left_value + &right_value);
+
+    let object = Object::String(format!("{}{}", left_value, right_value).into());
     Ok(object)
 }

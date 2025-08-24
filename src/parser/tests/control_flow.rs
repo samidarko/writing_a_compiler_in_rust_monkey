@@ -1,6 +1,7 @@
 use crate::ast;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, Result};
+use smallvec::smallvec;
 
 #[test]
 fn if_else_expression() -> Result<()> {
@@ -13,9 +14,11 @@ fn if_else_expression() -> Result<()> {
             "if (true) { 1 }",
             ast::IfExpression {
                 condition: Box::new(ast::Expression::Boolean(true)),
-                consequence: ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::Int(1))],
-                },
+                consequence: Box::new(ast::BlockStatement {
+                    statements: smallvec![Box::new(ast::Statement::Expression(
+                        ast::Expression::Int(1)
+                    ))],
+                }),
                 alternative: None,
             },
         ),
@@ -23,12 +26,16 @@ fn if_else_expression() -> Result<()> {
             "if (false) { 0 } else { 1 }",
             ast::IfExpression {
                 condition: Box::new(ast::Expression::Boolean(false)),
-                consequence: ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::Int(0))],
-                },
-                alternative: Some(ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::Int(1))],
+                consequence: Box::new(ast::BlockStatement {
+                    statements: smallvec![Box::new(ast::Statement::Expression(
+                        ast::Expression::Int(0)
+                    ))],
                 }),
+                alternative: Some(Box::new(ast::BlockStatement {
+                    statements: smallvec![Box::new(ast::Statement::Expression(
+                        ast::Expression::Int(1)
+                    ))],
+                })),
             },
         ),
     ];
@@ -58,18 +65,18 @@ fn for_loop_expression() -> Result<()> {
     let mut parser: Parser;
     let mut program: ast::Program;
 
-    let tests = vec![
-        (
-            "for (x in arr) { x }",
-            ast::ForExpression {
-                variable: "x".to_string(),
-                collection: Box::new(ast::Expression::Identifier("arr".to_string())),
-                body: ast::BlockStatement {
-                    statements: vec![ast::Statement::Expression(ast::Expression::Identifier("x".to_string()))],
-                },
-            },
-        ),
-    ];
+    let tests = vec![(
+        "for (x in arr) { x }",
+        ast::ForExpression {
+            variable: "x".into(),
+            collection: Box::new(ast::Expression::Identifier("arr".into())),
+            body: Box::new(ast::BlockStatement {
+                statements: smallvec![Box::new(ast::Statement::Expression(
+                    ast::Expression::Identifier("x".into())
+                ))],
+            }),
+        },
+    )];
 
     for test in tests {
         lexer = Lexer::new(test.0.chars().collect());

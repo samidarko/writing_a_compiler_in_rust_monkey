@@ -24,7 +24,7 @@ pub fn eval_program(program: Program, environment: Env) -> Result<Object> {
 pub fn eval_block_statement(block_statement: BlockStatement, environment: Env) -> Result<Object> {
     let mut result: Object = Object::Null;
     for statement in block_statement.statements {
-        let object = eval_statement(statement, Rc::clone(&environment))?;
+        let object = eval_statement(*statement, Rc::clone(&environment))?;
 
         if let Object::Return(_) = object {
             return Ok(object);

@@ -16,9 +16,9 @@
 //!
 //! // Represents: let x = 5;
 //! let program = Program {
-//!     statements: vec![
+//!     statements: smallvec::smallvec![
 //!         Statement::Let(LetStatement {
-//!             name: "x".to_string(),
+//!             name: "x".into(),
 //!             value: Expression::Int(5),
 //!         })
 //!     ]
@@ -26,6 +26,7 @@
 //! ```
 
 use crate::token::Token;
+use smallvec::SmallVec;
 use std::collections::BTreeMap;
 
 mod fmt;
@@ -45,7 +46,7 @@ pub enum Node {
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Program {
     /// The statements that make up this program
-    pub statements: Vec<Statement>,
+    pub statements: SmallVec<[Statement; 8]>,
 }
 
 /// Statements are executable units that don't produce values.
@@ -63,7 +64,7 @@ pub enum Statement {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LetStatement {
-    pub name: String,
+    pub name: Box<str>,
     pub value: Expression,
 }
 
@@ -74,16 +75,16 @@ pub struct ReturnStatement {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockStatement {
-    pub statements: Vec<Statement>,
+    pub statements: SmallVec<[Box<Statement>; 4]>,
 }
 
 /// Expressions are units that produce values when evaluated.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expression {
     /// Variable or function name
-    Identifier(String),
+    Identifier(Box<str>),
     /// String literal
-    String(String),
+    String(Box<str>),
     /// Boolean literal (true/false)
     Boolean(bool),
     /// Null literal
@@ -99,9 +100,9 @@ pub enum Expression {
     /// Function literal (`fn(params) { body }`)
     Function(FunctionLiteral),
     /// Function call (`func(args)`)
-    Call(CallExpression),
+    Call(Box<CallExpression>),
     /// Array literal (`[1, 2, 3]`)
-    Array(ArrayLiteral),
+    Array(Box<ArrayLiteral>),
     /// Index expression (`arr[0]`, `hash["key"]`)
     Index(IndexExpression),
     /// Hash map literal (`{"key": "value"}`)
@@ -136,19 +137,19 @@ pub struct InfixExpression {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct IfExpression {
     pub(crate) condition: Box<Expression>,
-    pub(crate) consequence: BlockStatement,
-    pub(crate) alternative: Option<BlockStatement>,
+    pub(crate) consequence: Box<BlockStatement>,
+    pub(crate) alternative: Option<Box<BlockStatement>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FunctionLiteral {
-    pub(crate) parameters: Vec<String>, // Parameter names (identifiers)
-    pub(crate) body: BlockStatement,
+    pub(crate) parameters: SmallVec<[Box<str>; 4]>, // Parameter names (identifiers)
+    pub(crate) body: Box<BlockStatement>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ArrayLiteral {
-    pub(crate) elements: Vec<Expression>,
+    pub(crate) elements: SmallVec<[Box<Expression>; 4]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -159,26 +160,26 @@ pub struct HashLiteral {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CallExpression {
     pub(crate) function: Box<Expression>, // Identifier or FunctionLiteral
-    pub(crate) arguments: Vec<Expression>,
+    pub(crate) arguments: SmallVec<[Box<Expression>; 4]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AssignmentExpression {
-    pub(crate) name: String,             // Variable name being assigned to
-    pub(crate) value: Box<Expression>,   // Value being assigned
+    pub(crate) name: Box<str>,         // Variable name being assigned to
+    pub(crate) value: Box<Expression>, // Value being assigned
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WhileExpression {
-    pub(crate) condition: Box<Expression>,  // Loop condition
-    pub(crate) body: BlockStatement,        // Loop body
+    pub(crate) condition: Box<Expression>, // Loop condition
+    pub(crate) body: Box<BlockStatement>,  // Loop body
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ForExpression {
-    pub(crate) variable: String,            // Loop variable name
+    pub(crate) variable: Box<str>,          // Loop variable name
     pub(crate) collection: Box<Expression>, // Collection to iterate over
-    pub(crate) body: BlockStatement,        // Loop body
+    pub(crate) body: Box<BlockStatement>,   // Loop body
 }
 
 // #[derive(Clone, Debug, PartialEq)]
@@ -190,13 +191,14 @@ pub struct ForExpression {
 #[cfg(test)]
 mod tests {
     use crate::ast::{Expression, LetStatement, Program, Statement};
+    use smallvec::smallvec;
 
     #[test]
     fn string() {
         let program = Program {
-            statements: vec![Statement::Let(LetStatement {
-                name: "x".to_string(),
-                value: Expression::Identifier("y".to_string()),
+            statements: smallvec![Statement::Let(LetStatement {
+                name: "x".into(),
+                value: Expression::Identifier("y".into()),
             })],
         };
         assert_eq!(format!("{}", program), "let x = y;");

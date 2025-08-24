@@ -16,10 +16,10 @@
 //!
 //! ```rust
 //! use monkey_interpreter_rs::{
-//!     lexer::Lexer, 
-//!     parser::Parser, 
-//!     evaluator::{eval, EvaluatorError}, 
-//!     ast::Node, 
+//!     lexer::Lexer,
+//!     parser::Parser,
+//!     evaluator::{eval, EvaluatorError},
+//!     ast::Node,
 //!     object::environment::Environment
 //! };
 //!
@@ -42,12 +42,12 @@
 //! ```rust
 //! use monkey_interpreter_rs::{lexer::Lexer, parser::Parser, evaluator::eval, ast::Node, object::environment::Environment};
 //!
-//! let input = "x + 5"; // Undefined variable 
+//! let input = "x + 5"; // Undefined variable
 //! let lexer = Lexer::new(input.chars().collect());
 //! let mut parser = Parser::new(lexer)?;
 //! let program = parser.parse()?;
 //! let environment = Environment::new();
-//! 
+//!
 //! match eval(Node::Program(program), environment) {
 //!     Ok(result) => println!("Result: {}", result),
 //!     Err(err) => match err {

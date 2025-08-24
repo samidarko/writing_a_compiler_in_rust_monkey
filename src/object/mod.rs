@@ -24,7 +24,7 @@
 //!
 //! // Create some objects
 //! let number = Object::Int(42);
-//! let text = Object::String("hello".to_string());
+//! let text = Object::String("hello".into());
 //! let bool_val = Object::Boolean(true);
 //!
 //! // Use an environment
@@ -38,6 +38,7 @@ pub mod environment;
 mod fmt;
 
 use crate::ast;
+use smallvec::SmallVec;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::mem;
@@ -53,7 +54,7 @@ pub enum Object {
     /// Boolean value (true/false)
     Boolean(bool),
     /// String value
-    String(String),
+    String(Box<str>),
     /// Null value
     Null,
     /// Return value wrapper (used for control flow)
@@ -63,7 +64,7 @@ pub enum Object {
     /// Built-in function implemented in Rust
     Builtin(BuiltinFunction),
     /// Array of objects
-    Array(ArrayLiteral),
+    Array(Box<ArrayLiteral>),
     /// Error object containing error message
     Error(String),
     /// Hash map with object keys and values
@@ -85,7 +86,7 @@ impl Object {
     ///
     /// let a = Object::Int(5);
     /// let b = Object::Int(10);
-    /// let c = Object::String("hello".to_string());
+    /// let c = Object::String("hello".into());
     ///
     /// assert!(a.is_same_variant(&b)); // Both are Int variants
     /// assert!(!a.is_same_variant(&c)); // Different variants
@@ -114,7 +115,7 @@ impl ReturnValue {
 
 #[derive(Clone, Debug)]
 pub struct Function {
-    pub(crate) parameters: Vec<String>,
+    pub(crate) parameters: SmallVec<[Box<str>; 4]>,
     pub(crate) body: ast::BlockStatement,
     pub(crate) env: environment::Env, // shared, not a by-value clone
 }
@@ -151,7 +152,7 @@ pub struct BuiltinFunction {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ArrayLiteral {
-    pub elements: Vec<Object>,
+    pub elements: SmallVec<[Box<Object>; 4]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

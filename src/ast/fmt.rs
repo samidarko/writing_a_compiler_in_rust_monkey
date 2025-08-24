@@ -168,6 +168,10 @@ impl Display for WhileExpression {
 
 impl Display for ForExpression {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "for ({} in {}) {{ {} }}", self.variable, self.collection, self.body)
+        write!(
+            f,
+            "for ({} in {}) {{ {} }}",
+            self.variable, self.collection, self.body
+        )
     }
 }

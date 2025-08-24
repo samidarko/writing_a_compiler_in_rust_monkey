@@ -43,7 +43,6 @@ use std::{mem, result};
 // Re-export for convenience
 pub use precedence::{get_token_precedence, Precedence};
 
-
 /// Details about an unexpected token encountered during parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnexpectedToken {
@@ -212,7 +211,10 @@ impl Parser {
             self.next_token()?
         }
 
-        Ok(ast::Statement::Let(ast::LetStatement { name, value }))
+        Ok(ast::Statement::Let(ast::LetStatement {
+            name: name.into(),
+            value,
+        }))
     }
 
     fn parse_return_statement(&mut self) -> Result<ast::Statement> {
@@ -257,9 +259,9 @@ impl Parser {
 
     fn prefix_parse(&mut self) -> Result<ast::Expression> {
         let expression = match &self.current {
-            Token::Ident(value) => ast::Expression::Identifier(value.to_string()),
+            Token::Ident(value) => ast::Expression::Identifier(value.clone()),
             Token::Int(value) => ast::Expression::Int(*value),
-            Token::String(value) => ast::Expression::String(value.to_string()),
+            Token::String(value) => ast::Expression::String(value.clone()),
             Token::Asterisk | Token::Bang | Token::Minus => return self.parse_prefix_expression(),
             Token::True | Token::False => return self.parse_boolean(),
             Token::Null => Expression::Null,
@@ -347,7 +349,9 @@ impl Parser {
             self.next_token()?;
         }
 
-        Ok(ast::Statement::Block(ast::BlockStatement { statements }))
+        Ok(ast::Statement::Block(ast::BlockStatement {
+            statements: statements.into_iter().map(Box::new).collect(),
+        }))
     }
 
     fn parse_if_expression(&mut self) -> Result<ast::Expression> {
@@ -373,7 +377,7 @@ impl Parser {
         if self.peek != Token::Else {
             return Ok(ast::Expression::If(ast::IfExpression {
                 condition,
-                consequence,
+                consequence: Box::new(consequence),
                 alternative: None,
             }));
         }
@@ -383,7 +387,7 @@ impl Parser {
         self.next_token()?;
 
         let alternative = if let ast::Statement::Block(block) = self.parse_block_statement()? {
-            Some(block)
+            Some(Box::new(block))
         } else {
             return Err(ParserError::UnexpectedToken(UnexpectedToken {
                 want: "else block statement".to_string(),
@@ -394,11 +398,11 @@ impl Parser {
 
         Ok(ast::Expression::If(ast::IfExpression {
             condition,
-            consequence,
+            consequence: Box::new(consequence),
             alternative,
         }))
     }
-    
+
     fn parse_while_expression(&mut self) -> Result<ast::Expression> {
         self.expect_peek(Token::LParen)?;
 
@@ -420,7 +424,7 @@ impl Parser {
 
         Ok(ast::Expression::While(ast::WhileExpression {
             condition,
-            body,
+            body: Box::new(body),
         }))
     }
 
@@ -428,10 +432,10 @@ impl Parser {
         // Follow the exact same pattern as while_expression
         self.expect_peek(Token::LParen)?;
         self.next_token()?; // Advance to identifier
-        
+
         // Parse variable name
         let variable = if let Token::Ident(name) = &self.current {
-            name.clone()
+            name.as_ref().to_string().into()
         } else {
             return Err(ParserError::UnexpectedToken(UnexpectedToken {
                 want: "identifier".to_string(),
@@ -445,8 +449,8 @@ impl Parser {
 
         // Parse collection expression
         let collection = Box::new(self.parse_expression(Precedence::Lowest)?);
-        
-        // Follow exact same pattern as while parsing  
+
+        // Follow exact same pattern as while parsing
         self.expect_peek(Token::RParen)?;
         self.expect_current(Token::RParen)?;
         self.expect_current(Token::LBrace)?;
@@ -465,17 +469,17 @@ impl Parser {
         Ok(ast::Expression::For(ast::ForExpression {
             variable,
             collection,
-            body,
+            body: Box::new(body),
         }))
     }
 
     fn parse_call_expression(&mut self, function: Expression) -> Result<Expression> {
         let arguments = self.parse_expression_list(Token::RParen)?;
 
-        Ok(Expression::Call(ast::CallExpression {
+        Ok(Expression::Call(Box::new(ast::CallExpression {
             function: Box::new(function),
-            arguments,
-        }))
+            arguments: arguments.into_iter().map(Box::new).collect(),
+        })))
     }
 
     fn parse_function_literal(&mut self) -> Result<Expression> {
@@ -497,15 +501,19 @@ impl Parser {
         };
 
         Ok(Expression::Function(ast::FunctionLiteral {
-            parameters,
-            body,
+            parameters: parameters.into_iter().map(|s| s.into()).collect(),
+            body: Box::new(body),
         }))
     }
 
     fn parse_array_literal(&mut self) -> Result<Expression> {
-        Ok(Expression::Array(ast::ArrayLiteral {
-            elements: self.parse_expression_list(Token::RBracket)?,
-        }))
+        Ok(Expression::Array(Box::new(ast::ArrayLiteral {
+            elements: self
+                .parse_expression_list(Token::RBracket)?
+                .into_iter()
+                .map(Box::new)
+                .collect(),
+        })))
     }
 
     fn parse_hash_literal(&mut self) -> Result<Expression> {
@@ -564,7 +572,7 @@ impl Parser {
         self.next_token()?;
         // Function parameters must be identifiers
         match &self.current {
-            Token::Ident(name) => parameters.push(name.clone()),
+            Token::Ident(name) => parameters.push(name.as_ref().to_string()),
             _ => {
                 return Err(ParserError::UnexpectedToken(UnexpectedToken {
                     want: "identifier".to_string(),
@@ -578,7 +586,7 @@ impl Parser {
             self.next_token()?;
             self.next_token()?;
             match &self.current {
-                Token::Ident(name) => parameters.push(name.clone()),
+                Token::Ident(name) => parameters.push(name.as_ref().to_string()),
                 _ => {
                     return Err(ParserError::UnexpectedToken(UnexpectedToken {
                         want: "identifier".to_string(),
@@ -614,14 +622,17 @@ impl Parser {
 
         Ok(expression)
     }
-    
+
     fn parse_assignment_expression(&mut self, left: Expression) -> Result<Expression> {
         // The left side must be an identifier
         if let Expression::Identifier(name) = left {
             self.next_token()?; // consume '='
-            // For right associativity, use Assignment precedence - 1, but since Assignment is already low, use Lowest
+                                // For right associativity, use Assignment precedence - 1, but since Assignment is already low, use Lowest
             let value = Box::new(self.parse_expression(Precedence::Assignment)?);
-            Ok(Expression::Assignment(ast::AssignmentExpression { name, value }))
+            Ok(Expression::Assignment(ast::AssignmentExpression {
+                name,
+                value,
+            }))
         } else {
             Err(ParserError::UnexpectedInfix(
                 Token::Assign,

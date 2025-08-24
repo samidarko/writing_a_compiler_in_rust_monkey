@@ -19,7 +19,7 @@
 //! let mut lexer = Lexer::new(input.chars().collect());
 //!
 //! assert_eq!(lexer.next_token().unwrap(), Token::Let);
-//! assert_eq!(lexer.next_token().unwrap(), Token::Ident("x".to_string()));
+//! assert_eq!(lexer.next_token().unwrap(), Token::Ident("x".into()));
 //! assert_eq!(lexer.next_token().unwrap(), Token::Assign);
 //! assert_eq!(lexer.next_token().unwrap(), Token::Int(42));
 //! assert_eq!(lexer.next_token().unwrap(), Token::Semicolon);
@@ -27,7 +27,7 @@
 
 mod fmt;
 
-use crate::token::Token;
+use crate::token::{intern::create_optimized_string, Token};
 use std::{num, result};
 
 /// Represents a position in the source code.
@@ -233,7 +233,7 @@ impl Lexer {
             ')' => Token::RParen,
             '[' => Token::LBracket,
             ']' => Token::RBracket,
-            '"' => Token::String(self.read_string()),
+            '"' => Token::String(self.read_string().into()),
             '\u{0000}' => Token::EoF,
             _ if is_letter(self.ch) => {
                 let literal = self.read_identifier();
@@ -249,7 +249,7 @@ impl Lexer {
                     "while" => Token::While,
                     "for" => Token::For,
                     "in" => Token::In,
-                    i => Token::Ident(i.to_string()),
+                    i => Token::Ident(create_optimized_string(i.into())),
                 };
                 return Ok(tok);
             }
@@ -437,39 +437,39 @@ true || false;
 "#;
         let expectations: Vec<Token> = Vec::from([
             Let,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Assign,
             Int(5),
             Semicolon,
             Let,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             Assign,
             Int(10),
             Semicolon,
             Let,
-            Ident("add".to_string()),
+            Ident("add".into()),
             Assign,
             Fn,
             LParen,
-            Ident("x".to_string()),
+            Ident("x".into()),
             Comma,
-            Ident("y".to_string()),
+            Ident("y".into()),
             RParen,
             LBrace,
-            Ident("x".to_string()),
+            Ident("x".into()),
             Plus,
-            Ident("y".to_string()),
+            Ident("y".into()),
             Semicolon,
             RBrace,
             Semicolon,
             Let,
-            Ident("result".to_string()),
+            Ident("result".into()),
             Assign,
-            Ident("add".to_string()),
+            Ident("add".into()),
             LParen,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Comma,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             RParen,
             Semicolon,
             Bang,
@@ -509,9 +509,9 @@ true || false;
             NotEq,
             Int(9),
             Semicolon,
-            String("foobar".to_string()),
+            String("foobar".into()),
             Semicolon,
-            String("foo bar".to_string()),
+            String("foo bar".into()),
             Semicolon,
             LBracket,
             Int(1),
@@ -520,9 +520,9 @@ true || false;
             RBracket,
             Semicolon,
             LBrace,
-            String("foo".to_string()),
+            String("foo".into()),
             Colon,
-            String("bar".to_string()),
+            String("bar".into()),
             RBrace,
             Semicolon,
             Int(10),
@@ -560,16 +560,16 @@ true || false;
             "let counter = fn(x) { if (x > 100) { return true; } else { counter(x + 1); } };";
         let expectations: Vec<Token> = Vec::from([
             Let,
-            Ident("counter".to_string()),
+            Ident("counter".into()),
             Assign,
             Fn,
             LParen,
-            Ident("x".to_string()),
+            Ident("x".into()),
             RParen,
             LBrace,
             If,
             LParen,
-            Ident("x".to_string()),
+            Ident("x".into()),
             Gt,
             Int(100),
             RParen,
@@ -580,9 +580,9 @@ true || false;
             RBrace,
             Else,
             LBrace,
-            Ident("counter".to_string()),
+            Ident("counter".into()),
             LParen,
-            Ident("x".to_string()),
+            Ident("x".into()),
             Plus,
             Int(1),
             RParen,
@@ -606,11 +606,8 @@ true || false;
     #[test]
     fn string_escape_sequences() -> Result<()> {
         let input = r#""hello\nworld\t\"test\"\\";"#;
-        let expectations: Vec<Token> = Vec::from([
-            String("hello\nworld\t\"test\"\\".to_string()),
-            Semicolon,
-            EoF,
-        ]);
+        let expectations: Vec<Token> =
+            Vec::from([String("hello\nworld\t\"test\"\\".into()), Semicolon, EoF]);
         let mut lexer = Lexer::new(input.chars().collect());
         let mut tok;
 
@@ -626,7 +623,7 @@ true || false;
     fn string_unknown_escape_sequences() -> Result<()> {
         let input = r#""hello\xworld\z";"#;
         let expectations: Vec<Token> = Vec::from([
-            Token::String("hello\\xworld\\z".to_string()),
+            Token::String("hello\\xworld\\z".into()),
             Token::Semicolon,
             Token::EoF,
         ]);
@@ -652,7 +649,7 @@ true || false;
 
         // Second token: "x" at line 1, column 5
         let token = lexer.next_token()?;
-        assert_eq!(token, Token::Ident("x".to_string()));
+        assert_eq!(token, Token::Ident("x".into()));
 
         // Skip to second line - "let"
         lexer.next_token()?; // "="
@@ -741,21 +738,21 @@ let result = five + ten;"#;
 
         let expectations: Vec<Token> = Vec::from([
             Let,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Assign,
             Int(5),
             Semicolon,
             Let,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             Assign,
             Int(10),
             Semicolon,
             Let,
-            Ident("result".to_string()),
+            Ident("result".into()),
             Assign,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Plus,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             Semicolon,
             EoF,
         ]);
@@ -782,21 +779,21 @@ let ten = 10;
 
         let expectations: Vec<Token> = Vec::from([
             Let,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Assign,
             Int(5),
             Semicolon,
             Let,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             Assign,
             Int(10),
             Semicolon,
             Let,
-            Ident("result".to_string()),
+            Ident("result".into()),
             Assign,
-            Ident("five".to_string()),
+            Ident("five".into()),
             Plus,
-            Ident("ten".to_string()),
+            Ident("ten".into()),
             Semicolon,
             EoF,
         ]);
@@ -843,7 +840,7 @@ let ten = 10;
 let x = 1;"#;
 
         let expectations: Vec<Token> =
-            Vec::from([Let, Ident("x".to_string()), Assign, Int(1), Semicolon, EoF]);
+            Vec::from([Let, Ident("x".into()), Assign, Int(1), Semicolon, EoF]);
 
         let mut lexer = Lexer::new(input.chars().collect());
         let mut tok;

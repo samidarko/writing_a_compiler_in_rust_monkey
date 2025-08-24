@@ -1,6 +1,6 @@
 use crate::parser::{ParserError, UnexpectedToken};
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

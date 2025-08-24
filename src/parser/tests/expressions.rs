@@ -18,8 +18,7 @@ fn identifier_expression() -> Result<()> {
     );
 
     let statement = &program.statements[0];
-    let expected =
-        ast::Statement::Expression(ast::Expression::Identifier("foobar".to_string()));
+    let expected = ast::Statement::Expression(ast::Expression::Identifier("foobar".into()));
     assert_eq!(statement, &expected);
     Ok(())
 }
@@ -72,9 +71,9 @@ fn string_literal_expression() -> Result<()> {
     let mut parser = Parser::new(lexer)?;
     let program = parser.parse()?;
     let expected: Vec<ast::Statement> = vec![ast::Statement::Expression(Expression::String(
-        "hello world".to_string(),
+        "hello world".into(),
     ))];
-    assert_eq!(&program.statements, &expected);
+    assert_eq!(&program.statements.to_vec(), &expected);
     Ok(())
 }
 
